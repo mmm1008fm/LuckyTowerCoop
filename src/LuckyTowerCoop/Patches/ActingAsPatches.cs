@@ -105,6 +105,20 @@ namespace LuckyTowerCoop.Patches
             return __exception;
         }
 
+        // --- применение урона оружием: рычаги и автоматы платят монетами того, кто ударил; убийство засчитывается ему ---
+
+        [HarmonyPatch(typeof(Weapon), "ApplyDamage")]
+        [HarmonyPrefix]
+        private static void WeaponApplyDamagePrefix(Weapon __instance, out TargetSwap.State __state) => __state = SwapIfP2(__instance.Owner);
+
+        [HarmonyPatch(typeof(Weapon), "ApplyDamage")]
+        [HarmonyFinalizer]
+        private static Exception WeaponApplyDamageFinalizer(TargetSwap.State __state, Exception __exception)
+        {
+            TargetSwap.Restore(__state);
+            return __exception;
+        }
+
         // --- кошель: подставляем его владельца ---
 
         private static GamePlayer OwnerOf(GoldSack sack)

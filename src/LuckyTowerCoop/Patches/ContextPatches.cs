@@ -34,6 +34,11 @@ namespace LuckyTowerCoop.Patches
             }
             try
             {
+                // окно выбора при открытии уходит под точку «иконки» NPC — по иерархии его не узнать, сверяем с окном второго игрока
+                if (c is InteractionWindow win && p2.Components != null && p2.Components.InteractionWindow == win)
+                {
+                    return p2;
+                }
                 long key = ((long)c.GetInstanceID() << 16) ^ (uint)CoopPlayers.Generation;
                 if (!s_isSecond.TryGetValue(key, out bool second))
                 {

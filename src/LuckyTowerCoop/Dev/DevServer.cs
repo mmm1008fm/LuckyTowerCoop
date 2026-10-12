@@ -220,6 +220,11 @@ namespace LuckyTowerCoop.Dev
                     return path;
                 }
 
+                case "seed":
+                    // seed N — зафиксировать сид забега (хост/локально) до `load tower`; seed 0 — снова случайный
+                    DevSeedPatch.Forced = args.Length > 1 ? int.Parse(args[1]) : 0;
+                    return $"forced seed={DevSeedPatch.Forced}";
+
                 case "load":
                     switch (args.Length > 1 ? args[1] : "")
                     {
@@ -350,6 +355,38 @@ namespace LuckyTowerCoop.Dev
                     return list.Count > 0 ? string.Join("\n", list) : "no rooms";
                 }
 
+                case "shops":
+                {
+                    // автоматы / магазины / ремонтники по всем комнатам (включая неактивные): тип, имя, позиция, комната
+                    var sb = new StringBuilder();
+                    void Scan<T>() where T : MonoBehaviour
+                    {
+                        foreach (var o in UnityEngine.Object.FindObjectsByType<T>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                        {
+                            var room = o.GetComponentInParent<LuckyTower.RoomGeneration.Room>(true);
+                            sb.AppendLine($"{typeof(T).Name} {o.name} pos={o.transform.position} room={(room != null ? room.name : "-")} active={o.gameObject.activeInHierarchy}");
+                            var pf = typeof(T).GetField("m_price", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+                            if (pf != null)
+                            {
+                                sb.AppendLine($"    price={pf.GetValue(o)}");
+                            }
+                            foreach (var lv in o.GetComponentsInChildren<LuckyTower.Traps.Lever>(true))
+                            {
+                                sb.AppendLine($"    lever {lv.name} pos={lv.transform.position}");
+                            }
+                        }
+                    }
+                    Scan<LuckyTower.RoomGeneration.Automat>();
+                    Scan<LuckyTower.RoomGeneration.CompanionAutomat>();
+                    Scan<LuckyTower.RoomGeneration.PipeSystem>();
+                    Scan<Pawnshop>();
+                    Scan<LuckyTower.Village.PawnshopMain>();
+                    Scan<LuckyTower.Village.Barber>();
+                    Scan<Pipefitter>();
+                    Scan<DropAllCoinsDialogue>();
+                    return sb.Length > 0 ? sb.ToString() : "no shops";
+                }
+
                 case "ent":
                 {
                     // ent <id> — путь и активность сущности по цепочке родителей
@@ -376,11 +413,15 @@ namespace LuckyTowerCoop.Dev
                     {
                         return "no village data";
                     }
+                    if (args.Length > 2 && args[1] == "bank")
+                    {
+                        v.BankAccount = args[2] == "on";
+                    }
                     if (args.Length > 2 && args[1] == "house")
                     {
                         v.HouseLevel = int.Parse(args[2]);
                     }
-                    return $"HouseLevel={v.HouseLevel} SpawnThrone={v.SpawnThrone} difficulty={DataManager.Instance.GameData?.Difficulty}";
+                    return $"bankAccount={v.BankAccount} coinsBank={v.CoinsBank} HouseLevel={v.HouseLevel} SpawnThrone={v.SpawnThrone} difficulty={DataManager.Instance.GameData?.Difficulty}";
                 }
 
                 case "god":
@@ -862,6 +903,22 @@ namespace LuckyTowerCoop.Dev
                     return sb.Length > 0 ? sb.ToString() : "no players";
                 }
 
+                case "gold":
+                {
+                    // gold p1|p2 [N] — показать / установить число монет (хост или локальная игра)
+                    if (args.Length < 2)
+                    {
+                        return "usage: gold p1|p2 [N]";
+                    }
+                    var who = args[1] == "p2" ? (GamePlayer)CoopPlayers.P2 : CoopPlayers.P1;
+                    if (who == null)
+                    {
+                        return "no such player";
+                    }
+                    int total = args.Length > 2 ? CoopGold.Set(who, int.Parse(args[2])) : CoopGold.Count(who);
+                    return $"{args[1]} gold={total}";
+                }
+
                 case "hands":
                 {
                     var sb = new StringBuilder();
@@ -911,6 +968,28 @@ namespace LuckyTowerCoop.Dev
 
                 default:
                     return "unknown command: " + args[0];
+            }
+        }
+    }
+}
+
+namespace LuckyTowerCoop.Dev
+{
+    /// <summary>Отладка: фиксированный сид забега у хоста (одинаковая башня между запусками).</summary>
+    [HarmonyLib.HarmonyPatch(typeof(SegmentManager), nameof(SegmentManager.ResetSeed))]
+    internal static class DevSeedPatch
+    {
+        public static int Forced;
+
+        private static readonly HarmonyLib.AccessTools.FieldRef<SegmentManager, bool> s_useSeed = HarmonyLib.AccessTools.FieldRefAccess<SegmentManager, bool>("m_useSeed");
+        private static readonly HarmonyLib.AccessTools.FieldRef<SegmentManager, int> s_seed = HarmonyLib.AccessTools.FieldRefAccess<SegmentManager, int>("m_seed");
+
+        private static void Prefix(SegmentManager __instance)
+        {
+            if (Forced != 0 && !LuckyTowerCoop.Net.NetSession.IsClient)
+            {
+                s_useSeed(__instance) = true;
+                s_seed(__instance) = Forced;
             }
         }
     }
