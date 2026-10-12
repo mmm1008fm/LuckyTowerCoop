@@ -1,5 +1,5 @@
-# Отправка отладочной команды в игру (мод LuckyTowerCoop, Dev.CommandServer=true).
-# Пример: pwsh tools/dev.ps1 dump ; pwsh tools/dev.ps1 "hold p2 right 1"
+﻿# Send a debug command to the game (LuckyTowerCoop mod, Dev.CommandServer=true).
+# Example: pwsh tools/dev.ps1 dump ; pwsh tools/dev.ps1 "hold p2 right 1"
 param([Parameter(Mandatory)][string]$Command, [int]$Port = 47800, [int]$TimeoutMs = 5000)
 $udp = [System.Net.Sockets.UdpClient]::new()
 $udp.Client.ReceiveTimeout = $TimeoutMs

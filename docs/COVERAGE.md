@@ -1,223 +1,223 @@
-# Матрица покрытия игровых механик (кооп-мод)
+# Game Mechanics Coverage Matrix (co-op mod)
 
-Дата анализа: 2026-10-12. Метод: статический разбор `decompiled/Assembly-CSharp/` (1086 файлов, 1135 классов) и `src/LuckyTowerCoop/`; игру не запускали. `QUEUE-REPORT.md` не существует, поэтому «проверено» взято из `docs/PLAN.md` (раздел «Состояние»), `docs/TASKS.md` и `README.md`.
+Analysis date: 2026-10-12. Method: static review of `decompiled/Assembly-CSharp/` (1086 files, 1135 classes) and `src/LuckyTowerCoop/`; the game was not run. `QUEUE-REPORT.md` does not exist, so "verified" is taken from `docs/PLAN.md` (the "Status" section), `docs/TASKS.md` and `README.md`.
 
-## Как читать
-- **GM / CP** — число вхождений `GameManager.Instance.Player` (также `InstanceNoWarnings`, `?.`) и `Player.CurrentPlayer` в файле класса; для строк с несколькими классами сумма по уникальным файлам. Это вхождения, а не строки (`grep -c` даёт чуть меньше). Класс, вложенный в чужой файл, делит счётчики с файлом. `Player.VonWansts[0]` в игре встречается ещё 41 раз (в основном `CharacterUtilities`, `PatrolingEnemyUtilities`).
-- **Покрытие** — какой механизм мода работает:
-  - *глушится у клиента* — Update/FixedUpdate/LateUpdate, триггеры и коллизии класса выключены у клиента (`WorldPatches`: все наследники `Trap`, кроме `FlyingBehaviour` и `SpecialItem`, плюс `s_extraTypes`; `NetPatches`: Player, Enemy, NPC, FlyingBehaviour);
-  - *подмена P2* — на время вызова «текущий игрок» = P2 (`TargetSwap`): корутины P2 и унаследованные от них, физ. колбэки при входе коллайдера P2, Update компонентов на объекте P2, `GetDamaged`, `TransformAction`, удар оружием, кошель; для ИИ — ближайший игрок (`Enemy`, злой `NPC`, `FlyingBehaviour`, `EnemyDetectionRange`);
-  - *пересылается* — сообщения `Window`, `Talk`, `LightsOut`, `PlayerState`, `SceneLoad` и снапшоты объектов из `NetHost.WorldObjects` (всё с `Animator`, `Rigidbody2D`, `Trap`, `Lever`, `Damagable`, `TreasureChest`, `FlyingBehaviour`, `Character`, `PickupItem`);
-  - *сидировано* — `RandomizerPatches` (16 типов), `CaveSeedPatch`, общий сид забега (`SegmentManager.ResetSeed`);
-  - *нет* — специального кода нет.
-- **Статус**: ✅ покрыто механизмом и названо проверенным в PLAN/TASKS/README; 🟡 покрыто механизмом, не проверено; 🔴 по коду, вероятно, не работает для P2 или у клиента (причина в 5–10 словах).
-- Ключевая особенность: `Update` ловушек и менеджеров на хосте **не** обёрнут подменой. Подмена действует только на объектах P2, в колбэках P2 и в корутинах, запущенных под подменой. Всё, что читает `Player.CurrentPlayer` из чужого `Update`, видит P1.
-- README (раздел «Известные ограничения») строкой про зелье превращения устарел: PLAN (фаза 5) называет зелье-монстр для P2 проверенным; про бутылку возрождения строка верна.
+## How to read
+- **GM / CP** — the number of occurrences of `GameManager.Instance.Player` (also `InstanceNoWarnings`, `?.`) and `Player.CurrentPlayer` in the class file; for rows with several classes, the sum over unique files. These are occurrences, not lines (`grep -c` gives slightly fewer). A class nested in another file shares the counters with that file. `Player.VonWansts[0]` appears in the game 41 more times (mostly in `CharacterUtilities`, `PatrolingEnemyUtilities`).
+- **Coverage** — which mod mechanism applies:
+  - *muted on client* — the class's Update/FixedUpdate/LateUpdate, triggers and collisions are disabled on the client (`WorldPatches`: all descendants of `Trap` except `FlyingBehaviour` and `SpecialItem`, plus `s_extraTypes`; `NetPatches`: Player, Enemy, NPC, FlyingBehaviour);
+  - *P2 swap* — for the duration of the call the "current player" = P2 (`TargetSwap`): P2's coroutines and those inherited from them, physics callbacks when P2's collider enters, Update of components on the P2 object, `GetDamaged`, `TransformAction`, weapon hit, purse; for AI, the nearest player (`Enemy`, evil `NPC`, `FlyingBehaviour`, `EnemyDetectionRange`);
+  - *forwarded* — `Window`, `Talk`, `LightsOut`, `PlayerState`, `SceneLoad` messages and object snapshots from `NetHost.WorldObjects` (everything with `Animator`, `Rigidbody2D`, `Trap`, `Lever`, `Damagable`, `TreasureChest`, `FlyingBehaviour`, `Character`, `PickupItem`);
+  - *seeded* — `RandomizerPatches` (16 types), `CaveSeedPatch`, the shared run seed (`SegmentManager.ResetSeed`);
+  - *none* — there is no dedicated code.
+- **Status**: ✅ covered by a mechanism and named as verified in PLAN/TASKS/README; 🟡 covered by a mechanism, not verified; 🔴 by the code, probably does not work for P2 or on the client (reason in 5–10 words).
+- Key point: the `Update` of traps and managers on the host is **not** wrapped in the swap. The swap only applies on P2's objects, in P2's callbacks and in coroutines started under the swap. Anything that reads `Player.CurrentPlayer` from someone else's `Update` sees P1.
+- The README line in "Known limitations" about the transformation potion is outdated: PLAN (phase 5) lists the monster potion for P2 as verified; the line about the respawn bottle is correct.
 
-**Сводка (105 механик): ✅ 10 · 🟡 67 · 🔴 28.**
+**Summary (105 mechanics): ✅ 10 · 🟡 67 · 🔴 28.**
 
-| Раздел | ✅ | 🟡 | 🔴 | всего |
+| Section | ✅ | 🟡 | 🔴 | total |
 |---|---|---|---|---|
-| 1. Ловушки | 2 | 18 | 7 | 27 |
-| 2. Особые комнаты и испытания | 4 | 16 | 3 | 23 |
-| 3. NPC и диалоги | 1 | 7 | 5 | 13 |
-| 4. Злой маг Эвелиус | 0 | 1 | 4 | 5 |
-| 5. Компаньоны | 0 | 3 | 3 | 6 |
-| 6. Особые предметы и зелья | 2 | 10 | 2 | 14 |
-| 7. Смерть и воскрешение | 0 | 5 | 0 | 5 |
-| 8. Деревня | 0 | 2 | 0 | 2 |
-| 9. Концовки и катсцены | 0 | 1 | 2 | 3 |
-| 10. Достижения | 0 | 1 | 0 | 1 |
-| 11. Общие системы | 1 | 3 | 2 | 6 |
+| 1. Traps | 2 | 18 | 7 | 27 |
+| 2. Special rooms and challenges | 4 | 16 | 3 | 23 |
+| 3. NPCs and dialogues | 1 | 7 | 5 | 13 |
+| 4. Evil mage Evelius | 0 | 1 | 4 | 5 |
+| 5. Companions | 0 | 3 | 3 | 6 |
+| 6. Special items and potions | 2 | 10 | 2 | 14 |
+| 7. Death and revival | 0 | 5 | 0 | 5 |
+| 8. Village | 0 | 2 | 0 | 2 |
+| 9. Endings and cutscenes | 0 | 1 | 2 | 3 |
+| 10. Achievements | 0 | 1 | 0 | 1 |
+| 11. Common systems | 1 | 3 | 2 | 6 |
 
-## 1. Ловушки
+## 1. Traps
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| Шипы: пол, коннектор, колья | `TrapSpike`, `TrapSpikeConnector`, `StakeTrap` | Шипы выдвигаются по таймеру/триггеру и бьют по слою Player | 0 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 | урон по слою Player: P2 страдает как P1 |
-| Стомперы и давилки | `Stomper`, `CrusherTrap`, `CrusherManagerSemi`, `CrusherManager`, `DungeonEndCrusherMisc` | Падающие прессы, давилка в конце подземелья | 0 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 | пыль стомпера не регистрируется (косметика) |
-| Наковальня | `Anvil` | Падает при проходе; рвётся об острое оружие | 0 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 |  |
-| Стена со стрелами и бьющая стена | `ArrowWall`, `PunchWall` | Стреляет стрелами / бьёт кулаком из стены | 0 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 |  |
-| Маятник | `TrapPendulum` | Раскачивающийся маятник | 0 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 |  |
-| Подвесная бомба | `HangingBomb` | Бомба на верёвке: срезается и взрывается | 0 / 3 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 | проверка «оружие в руке» в OnTriggerEnter2D идёт под подменой P2 |
-| Мост-платформа | `BridgePlatform` | Мост поднимается/опускается по рычагу | 0 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 |  |
-| Рушащийся пол и провалы | `TrapCrumblingGap`, `DungeonEndCrumblingStep`, `ParkourGapInFloorTrap`, `TrapGap` | Пол падает под весом, парковые провалы, пасть хватает персонажа | 0 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 | жалоба «пол падает поздно» закрыта фазой 2, повторно вживую не проверялась |
-| Монстры из пропастей и стен | `PotentialMonster`, `MonsterInGap`, `MonsterInGapTrigger`, `MonsterInWall`, `MonsterInWallTrigger`, `MonsterInWallGrab` …(+1) | Монстр выскакивает из пропасти/стены при проходе | 0 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2; созданное на ходу создаётся у клиента из префаба | 🟡 | «есть в 0.3.2 — проверить» (PLAN, фаза 2) |
-| Крюки | `Hook`, `HookOnTouch`, `HookedItemParent` | Крюк цепляет предмет или персонажа | 1 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 |  |
-| Ветровая зона | `TrapWindArea` | Ветер сдувает игрока | 0 / 4 | глушится у клиента; в снапшоте; колбэки под подменой P2, **Update без подмены (цель = P1)** | 🟡 | условие запуска идёт по CurrentPlayer (P1), зона ловит оба коллайдера |
-| Молотобоец (TrapHammerGuy) | `TrapHammerGuy`, `Hammerguy`, `TrapHammerguyFallSmallGap` | Погоня молотобойца за игроком и его компаньонами | 0 / 40 | глушится у клиента; в снапшоте; колбэки под подменой P2, **Update без подмены (цель = P1)** | 🔴 | гонится и бьёт только Player.CurrentPlayer (P1) |
-| Молотобоец в стене | `HammerGuyWall` | Хватает компаньонов игрока из стены | 4 / 0 | глушится у клиента; в снапшоте; колбэки под подменой P2, **Update без подмены (цель = P1)** | 🔴 | берёт группу компаньонов только P1 |
-| Спящий гигант (Sleeper, TrapSleeper) | `Sleeper`, `TrapSleeper` | Стелс: рядом нельзя бегать, прыгать, бить, иначе проснётся | 0 / 30 | глушится у клиента; в снапшоте; колбэки под подменой P2, **Update без подмены (цель = P1)** | 🔴 | будится вводом P1 (Input.GetKey его клавиш) |
-| Оркестр (TrapBigBand) | `TrapBigBand` | Музыканты просыпаются, если игрок шумит рядом; барабаны | 0 / 18 | глушится у клиента; в снапшоте; колбэки под подменой P2, **Update без подмены (цель = P1)**; звук мира синхронизируется | 🔴 | стелс-проверка по вводу и позиции P1 |
-| Свет погас (TrapLightsOut) | `TrapLightsOut`, `LightsOutLever`, `LightsOutTrigger`, `DoorLightEvents`, `TorchLightHandler` | Темнота в комнате, свет возвращает рычаг или выход | 6 / 9 | глушится у клиента; в снапшоте; колбэки физики под подменой P2; пересылается Msg.LightsOut | ✅ | «свет погас» в обе стороны проверен автотестом (PLAN) |
-| Монстр в темноте | `LightsOutMonster` | Монстр появляется в темноте и душит игрока | 1 / 1 | не глушится (MonoBehaviour вне списка); в снапшоте | 🔴 | m_currentPlayer кэширует P1 |
-| Бочка с порохом | `TrapPowderKeg`, `SpecialItemPowderKeg`, `KegActivation`, `PowderKegEquipHelper` | Взрыв башни: видео, смерть игрока, конец забега | 13 / 4 | глушится у клиента; в снапшоте; колбэки физики под подменой P2; предмет-версия не глушится | 🔴 | убивает только slot0, видео клиенту не идёт (Task D) |
-| Рычаги и головоломки | `Lever`, `PuzzleLever`, `PuzzleLeverManager`, `TriggerCounter`, `PuzzlePortculis`, `PuzzleWeightedStep` …(+2) | Рычаги открывают решётки, шипы, таймер головоломки | 0 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2; удар P2 — оружие под подменой | ✅ | «запертые комнаты с рычагами» — автотест 12.10 |
-| Плиты-весы | `WeightedStepParent`, `GamblerWeightedStep`, `ContactSpikesWeightedStep`, `IndianaWeightedStep`, `SpecialWeightTrigger` | Нажимные плиты открывают двери и ловушки | 1 / 1 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 (подклассы со своими методами не в списке) | 🟡 | `m_playerInArea = CurrentPlayer` |
-| Летучие мыши и пчёлы | `BatBehaviour`, `BeeHaviour`, `FlyingBehaviour` | Летающие враги-ловушки, следят за игроком | 1 / 0 | глушится у клиента; цель — ближайший игрок (AiTargetPatches) | 🟡 | исправлено падение BatBehaviour.OnDisable у клиента |
-| Всасывающая труба | `SuctionPipe` | Труба затягивает игрока и переносит по трубе | 3 / 0 | не глушится у клиента; хост: колбэки под подменой P2 | 🔴 | затягивает только GameManager.Player |
-| Слизь на полу | `GooOnFloor`, `GooOnFloorTrigger`, `GooMidAir` | Скользкая слизь: замедление и блок ввода | 7 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 | скорость/ввод меняются у GM.Player вне колбэка P2 |
-| Дыры, печь, верёвки, потолочные давилки | `HoleInWall`, `Oven`, `Clothesline`, `CeilingCorpseCrusher`, `AimingTrapBehaviour`, `TrapTrashWindow` …(+2) | Разные механизмы: дыра в стене, печь, бельё, мусорное окно, рука из провала | 0 / 0 | не глушится у клиента; в снапшоте; хост: колбэки под подменой P2 | 🟡 | клиент исполняет логику параллельно хосту; урон у клиента блокирован |
-| Кроты, ритм, язык, силомер | `Mole`, `MoleHole`, `MoleHoleTrap`, `MoleTriggers`, `RythmTrap`, `Tongue` …(+2) | Мини-механизмы: кроты, ритм-ловушка, язык, шипы Индианы | 0 / 0 | не глушится у клиента; в снапшоте | 🟡 | Random в OnEnable/Start не сидирован |
-| Двери-ловушки | `TrapFakeDoor`, `CardBoardDoor`, `DialogueFakeDoor`, `IronMaidenDoor`, `MonsterDoor`, `ToiletDoor` …(+2) | Поддельные двери: картон, железная дева, туалет, монстр, дверь в гибель | 1 / 1 | BalconyFakeDoor глушится; остальные не глушатся; в снапшоте | 🟡 | «двери-ловушки не видны» закрыто фазой 2/0.3.4 |
-| Урон от касания | `DamageOnTouch` | Общий компонент урона: шипы, снаряды, враги | 0 / 5 | клиент: GetDamaged заглушён; хост: по месту | 🟡 | 5 обращений к CurrentPlayer |
+| Spikes: floor, connector, stakes | `TrapSpike`, `TrapSpikeConnector`, `StakeTrap` | Spikes extend on a timer/trigger and hit the Player layer | 0 / 0 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 | damage on the Player layer: P2 suffers like P1 |
+| Stompers and crushers | `Stomper`, `CrusherTrap`, `CrusherManagerSemi`, `CrusherManager`, `DungeonEndCrusherMisc` | Falling presses, the crusher at the end of the dungeon | 0 / 0 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 | stomper dust is not registered (cosmetic) |
+| Anvil | `Anvil` | Falls when passed; breaks on a sharp weapon | 0 / 0 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 |  |
+| Arrow wall and punching wall | `ArrowWall`, `PunchWall` | Shoots arrows / punches out of the wall | 0 / 0 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 |  |
+| Pendulum | `TrapPendulum` | Swinging pendulum | 0 / 0 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 |  |
+| Hanging bomb | `HangingBomb` | Bomb on a rope: gets cut and explodes | 0 / 3 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 | the "weapon in hand" check in OnTriggerEnter2D runs under the P2 swap |
+| Bridge platform | `BridgePlatform` | Bridge raises/lowers via a lever | 0 / 0 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 |  |
+| Crumbling floor and gaps | `TrapCrumblingGap`, `DungeonEndCrumblingStep`, `ParkourGapInFloorTrap`, `TrapGap` | Floor falls under weight, parkour gaps, a maw grabs the character | 0 / 0 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 | the "floor falls late" complaint was closed in phase 2, not re-checked live |
+| Monsters from gaps and walls | `PotentialMonster`, `MonsterInGap`, `MonsterInGapTrigger`, `MonsterInWall`, `MonsterInWallTrigger`, `MonsterInWallGrab` …(+1) | A monster jumps out of the gap/wall as you pass | 0 / 0 | muted on client; in snapshot; physics callbacks under P2 swap; objects created on the fly are created on the client from the prefab | 🟡 | "present in 0.3.2 — to check" (PLAN, phase 2) |
+| Hooks | `Hook`, `HookOnTouch`, `HookedItemParent` | A hook catches an item or a character | 1 / 0 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 |  |
+| Wind zone | `TrapWindArea` | Wind blows the player away | 0 / 4 | muted on client; in snapshot; callbacks under P2 swap, **Update without swap (target = P1)** | 🟡 | the trigger condition uses CurrentPlayer (P1), the zone catches both colliders |
+| Hammer guy (TrapHammerGuy) | `TrapHammerGuy`, `Hammerguy`, `TrapHammerguyFallSmallGap` | The hammer guy chases the player and their companions | 0 / 40 | muted on client; in snapshot; callbacks under P2 swap, **Update without swap (target = P1)** | 🔴 | chases and hits only Player.CurrentPlayer (P1) |
+| Hammer guy in the wall | `HammerGuyWall` | Grabs the player's companions out of the wall | 4 / 0 | muted on client; in snapshot; callbacks under P2 swap, **Update without swap (target = P1)** | 🔴 | takes only P1's companion group |
+| Sleeping giant (Sleeper, TrapSleeper) | `Sleeper`, `TrapSleeper` | Stealth: you must not run, jump or attack nearby, or it wakes up | 0 / 30 | muted on client; in snapshot; callbacks under P2 swap, **Update without swap (target = P1)** | 🔴 | woken by P1's input (Input.GetKey of its keys) |
+| Orchestra (TrapBigBand) | `TrapBigBand` | The musicians wake up if the player makes noise nearby; drums | 0 / 18 | muted on client; in snapshot; callbacks under P2 swap, **Update without swap (target = P1)**; world sound is synchronized | 🔴 | stealth check uses P1's input and position |
+| Lights out (TrapLightsOut) | `TrapLightsOut`, `LightsOutLever`, `LightsOutTrigger`, `DoorLightEvents`, `TorchLightHandler` | Darkness in the room; a lever or the exit brings the light back | 6 / 9 | muted on client; in snapshot; physics callbacks under P2 swap; Msg.LightsOut is forwarded | ✅ | "lights out" verified in both directions by autotest (PLAN) |
+| Monster in the dark | `LightsOutMonster` | A monster appears in the dark and strangles the player | 1 / 1 | not muted (MonoBehaviour outside the list); in snapshot | 🔴 | m_currentPlayer caches P1 |
+| Powder keg | `TrapPowderKeg`, `SpecialItemPowderKeg`, `KegActivation`, `PowderKegEquipHelper` | Tower explosion: video, player death, end of the run | 13 / 4 | muted on client; in snapshot; physics callbacks under P2 swap; the item version is not muted | 🔴 | kills only slot0, the video is not sent to the client (Task D) |
+| Levers and puzzles | `Lever`, `PuzzleLever`, `PuzzleLeverManager`, `TriggerCounter`, `PuzzlePortculis`, `PuzzleWeightedStep` …(+2) | Levers open portcullises, spikes, the puzzle timer | 0 / 0 | muted on client; in snapshot; physics callbacks under P2 swap; P2's hit — weapon under swap | ✅ | "locked rooms with levers" — autotest 12.10 |
+| Weighted plates | `WeightedStepParent`, `GamblerWeightedStep`, `ContactSpikesWeightedStep`, `IndianaWeightedStep`, `SpecialWeightTrigger` | Pressure plates open doors and traps | 1 / 1 | muted on client; in snapshot; physics callbacks under P2 swap (subclasses with their own methods are not on the list) | 🟡 | `m_playerInArea = CurrentPlayer` |
+| Bats and bees | `BatBehaviour`, `BeeHaviour`, `FlyingBehaviour` | Flying trap enemies, track the player | 1 / 0 | muted on client; target — nearest player (AiTargetPatches) | 🟡 | fixed the BatBehaviour.OnDisable crash on the client |
+| Suction pipe | `SuctionPipe` | The pipe sucks the player in and carries them along the pipe | 3 / 0 | not muted on client; host: callbacks under P2 swap | 🔴 | sucks in only GameManager.Player |
+| Goo on the floor | `GooOnFloor`, `GooOnFloorTrigger`, `GooMidAir` | Slippery goo: slows down and blocks input | 7 / 0 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 | speed/input are changed on GM.Player outside P2's callback |
+| Holes, oven, ropes, ceiling crushers | `HoleInWall`, `Oven`, `Clothesline`, `CeilingCorpseCrusher`, `AimingTrapBehaviour`, `TrapTrashWindow` …(+2) | Assorted mechanisms: hole in the wall, oven, laundry line, trash window, a hand from a gap | 0 / 0 | not muted on client; in snapshot; host: callbacks under P2 swap | 🟡 | the client runs the logic in parallel with the host; damage is blocked on the client |
+| Moles, rhythm, tongue, strength tester | `Mole`, `MoleHole`, `MoleHoleTrap`, `MoleTriggers`, `RythmTrap`, `Tongue` …(+2) | Mini-mechanisms: moles, rhythm trap, tongue, Indiana's spikes | 0 / 0 | not muted on client; in snapshot | 🟡 | Random in OnEnable/Start is not seeded |
+| Trap doors | `TrapFakeDoor`, `CardBoardDoor`, `DialogueFakeDoor`, `IronMaidenDoor`, `MonsterDoor`, `ToiletDoor` …(+2) | Fake doors: cardboard, iron maiden, toilet, monster, door to doom | 1 / 1 | BalconyFakeDoor is muted; the rest are not muted; in snapshot | 🟡 | "trap doors are not visible" closed in phase 2/0.3.4 |
+| Contact damage | `DamageOnTouch` | Common damage component: spikes, projectiles, enemies | 0 / 5 | client: GetDamaged is muted; host: in place | 🟡 | 5 references to CurrentPlayer |
 
-## 2. Особые комнаты и испытания
+## 2. Special rooms and challenges
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| Генерация: Regular, HUB, Exit, EnemyOnly, SegmentEnd | `RoomGenerator`, `SegmentManager`, `Room` | Сегмент строится целиком по сиду, двери соединяются | 13 / 0 | сидировано (общий сид забега, SegmentSeed); RoomCheck и resync | ✅ | отпечатки `[Gen]` сегментов 1–3 совпали (PLAN 12.10) |
-| Unique: Gambler | `GamblerBehavior`, `GamblerDialogue`, `Gambler`, `GamblerAction`, `GamblerUtilities`, `PuzzleMonsterGamble` …(+2) | Игра с монстром в кости, призы, драка при проигрыше | 39 / 2 | подмена P2 (диалог, корутины); Gambler — Enemy (ближайший); окно пересылается | 🟡 | 36 GM.Player в DialogueLogic: верно, только пока цепочка под подменой P2 |
-| Unique: DoorToDoom | `TrapDoorToDoom` | Дверь в «гибель»: особая ветка в GameManager.EnterDoorRoutine | 0 / 0 | не глушится; переход — голосование дверей | 🟡 | ветки DoorToDoom (GameManager :2163, :2331, :2477) не проверены |
-| Unique: IndianaJones | `IndianaJonesRoomGenerator`, `IndianaJonesSpikes`, `IndianaWeightedStep` | Комната с идолом: плита-весы, шипы, обвал | 0 / 0 | плита глушится; генератор использует Random без сида | 🟡 | IndianaJonesRoomGenerator не в списке сидирования |
-| Unique: HiddenTreasure | `HiddenRoom`, `SpawnTreasure`, `FillChest`, `LockedItems` | Скрытая комната с сокровищем | 1 / 0 | монеты приходят объектами хоста; SpawnTreasure не сидирован | 🟡 |  |
-| Unique: SantaRoom | `SnowyPufflesDoors`, `SnowyPufflesHelper` | Комната Санты с дверями-пуффлами | 4 / 0 | не глушится; сегмент берёт GM.Player.Stats.SegmentID | 🟡 |  |
-| Unique: BonusRoom, BonusRoomNoCompanion | `BonusRoomDoor` | Бонусная комната через особую дверь | 2 / 0 | сидировано; голосование дверей | ✅ | бонус-комнаты проверены автотестом 12.10 |
-| Companion, CompanionHUB | `CompanionSpawnSpot`, `CompanionAutomat`, `CompanionRandomizer`, `CompanionBalconyTrap` | Комната автомата компаньонов | 4 / 0 | CompanionRandomizer сидирован; CompanionBalconyTrap глушится; оплата под подменой P2 | 🟡 | оплата `GM.Player.Stats.CurrentGoldCount`; см. раздел «Компаньоны» |
-| Cauldron: котёл-головоломка | `PuzzleCauldron`, `PuzzleMakePotion`, `CauldronPullLever`, `CauldronPump`, `IngredientSlot`, `PuzzlePotion` | Варка зелья из ингредиентов, рычаг, насос | 0 / 5 | рычаги глушатся; IngredientSlot без сида | 🟡 |  |
-| LockedChest, ChestKey | `TreasureChest`, `TreasureKey`, `ChestSpawner`, `OpenChestHint` | Сундуки, ключи, запертые сундуки | 0 / 8 | сундук и ChestSpawner глушатся; ChestSpawner сидирован; despawn пересылается | 🟡 | «сундук не разбить» исправлен фазой 2, не помечен проверенным |
-| Crusher, Crumbling (конец подземелья) | `CrusherManager`, `DungeonEndCrumblingStep`, `DungeonEndCrusherMisc` | Финальная давилка и рушащиеся ступени | 0 / 0 | глушится у клиента; в снапшоте; колбэки физики под подменой P2 | 🟡 |  |
-| Torture: железная дева | `IronMaidenDoor`, `TrapFakeDoor` | Комната пыток: дверь-железная дева | 0 / 0 | не глушится; в снапшоте | 🟡 |  |
-| Lights out (комната) | `TrapLightsOut`, `LightsOutTrigger`, `LightsOutLever`, `LightsOutMonster` | Темнота, рычаг света, монстр | 7 / 10 | глушится; Msg.LightsOut | ✅ | свет проверен; монстр — отдельная 🔴 в разделе ловушек |
-| Balcony, BalconyEntrance, BalconyExit | `BalconyGenerator`, `BalconyBird`, `BalconyFakeDoor`, `BalconyDropTrigger`, `BalconyHatch`, `BalconyWindManager` …(+3) | Внешняя стена: окна, птицы, ловушки-двери, ветер, люк | 4 / 3 | глушится (птица, дверь, зона сброса); сидировано (генератор, ветер); в снапшоте | ✅ | 458/458 объектов (PLAN 12.10); слои глубины общие (README) |
-| LabHUB, LabRegular, LabKey, LabExit | `LabHubManager`, `LabAlarm`, `PatrolingEnemy`, `PatrolingEnemyUtilities`, `LabEnemyStates` | Лаборатория: многослойный хаб, патрули, тревога по слоям | 0 / 29 | ИИ по ближайшему (Enemy.Update); слой глубины общий | 🔴 | слой static CurrentPlayerLayer один на двоих |
-| Cave, CaveUnique | `CaveMadnessTrigger`, `CaveDoorSwitcher`, `MonsterCaveSpot`, `CaveConfiguration`, `MonsterSpawnSpot` | Пещеры после башни: безумие, монстры, двери | 2 / 0 | сидировано (CaveSeedPatch) | 🟡 | «ждёт проверки» (PLAN); задача очереди E |
-| SewerEntrance, SewerExit | `DrippingPipe`, `Critters`, `Snail`, `Rat`, `BaseAnimal` | Канализация: декор и мелкие существа; логика — флаги RoomGenerator | 0 / 0 | сидировано (общий сид); декор не регистрируется | 🟡 | отдельных классов канализации нет |
-| TowerExit, EndGameSpawn, выход из башни | `EndgameExitroomTrigger`, `ExitAutomatHelper`, `EndgameSettings`, `EveliusBasement` | Выход из башни, спавн финала, сердце Эвелиуса в руках | 6 / 0 | не глушится; сердце ищется у GM.Player | 🔴 | сердце ищется только в руках slot0 |
-| Tutorial | `TutorialEvelius`, `CommandEvents`, `IntroHelper`, `SkipIntro` | Обучающая сцена и подсказки | 3 / 0 | нет | 🟡 | не нужна для P2; CommandEvents.m_player = GM.Player |
-| ConnectRoomStart, ConnectRoomTarget | `RoomGenerator` | Соединительные комнаты между сегментами | 7 / 0 | сидировано | 🟡 | в генераторе, отдельно не проверялись |
-| Head-комнаты: ItemVault, Pawnshop, PillarWalk, BarberShop, HairMirror | `VonWanstHeadManager`, `ItemVault`, `PillarWalk`, `HeadRoom`, `HeadRoomPedestal`, `HeadroomExitDoor` …(+3) | Игрок уходит в «голову Ванста» с копией на ограниченное время | 18 / 9 | нет (одиночный менеджер, отключает slot0) | 🔴 | отключает Player.CurrentPlayer, подменяет GM.Player копией |
-| Укрытия (HideOut) | `HideOut`, `HideoutSpecialItem` | Прятаться в бочке/шкафу, компаньоны выходят рядом | 3 / 1 | подмена P2 при триггере | 🟡 |  |
-| Зеркальная платформа | `MirrorPlatform` | Платформа-зеркало работает при входе игрока | 0 / 0 | подмена P2 (физ. колбэки) | 🟡 | «зеркало только для хоста» — фаза 3, не помечено проверенным |
+| Generation: Regular, HUB, Exit, EnemyOnly, SegmentEnd | `RoomGenerator`, `SegmentManager`, `Room` | A segment is built entirely from the seed, doors are connected | 13 / 0 | seeded (shared run seed, SegmentSeed); RoomCheck and resync | ✅ | `[Gen]` fingerprints of segments 1–3 matched (PLAN 12.10) |
+| Unique: Gambler | `GamblerBehavior`, `GamblerDialogue`, `Gambler`, `GamblerAction`, `GamblerUtilities`, `PuzzleMonsterGamble` …(+2) | Dice game with a monster, prizes, a fight if you lose | 39 / 2 | P2 swap (dialogue, coroutines); Gambler is an Enemy (nearest); the window is forwarded | 🟡 | 36 GM.Player in DialogueLogic: correct only while the chain runs under the P2 swap |
+| Unique: DoorToDoom | `TrapDoorToDoom` | Door to "doom": a special branch in GameManager.EnterDoorRoutine | 0 / 0 | not muted; transition is a door vote | 🟡 | the DoorToDoom branches (GameManager :2163, :2331, :2477) are not verified |
+| Unique: IndianaJones | `IndianaJonesRoomGenerator`, `IndianaJonesSpikes`, `IndianaWeightedStep` | Idol room: weighted plate, spikes, cave-in | 0 / 0 | plate is muted; the generator uses unseeded Random | 🟡 | IndianaJonesRoomGenerator is not on the seeding list |
+| Unique: HiddenTreasure | `HiddenRoom`, `SpawnTreasure`, `FillChest`, `LockedItems` | Hidden room with treasure | 1 / 0 | coins arrive as host objects; SpawnTreasure is not seeded | 🟡 |  |
+| Unique: SantaRoom | `SnowyPufflesDoors`, `SnowyPufflesHelper` | Santa's room with puffle doors | 4 / 0 | not muted; the segment takes GM.Player.Stats.SegmentID | 🟡 |  |
+| Unique: BonusRoom, BonusRoomNoCompanion | `BonusRoomDoor` | Bonus room through a special door | 2 / 0 | seeded; door vote | ✅ | bonus rooms verified by autotest 12.10 |
+| Companion, CompanionHUB | `CompanionSpawnSpot`, `CompanionAutomat`, `CompanionRandomizer`, `CompanionBalconyTrap` | Companion vending machine room | 4 / 0 | CompanionRandomizer is seeded; CompanionBalconyTrap is muted; payment under P2 swap | 🟡 | payment `GM.Player.Stats.CurrentGoldCount`; see the "Companions" section |
+| Cauldron: puzzle cauldron | `PuzzleCauldron`, `PuzzleMakePotion`, `CauldronPullLever`, `CauldronPump`, `IngredientSlot`, `PuzzlePotion` | Brewing a potion from ingredients, lever, pump | 0 / 5 | levers are muted; IngredientSlot is unseeded | 🟡 |  |
+| LockedChest, ChestKey | `TreasureChest`, `TreasureKey`, `ChestSpawner`, `OpenChestHint` | Chests, keys, locked chests | 0 / 8 | chest and ChestSpawner are muted; ChestSpawner is seeded; despawn is forwarded | 🟡 | "chest can't be broken" fixed in phase 2, not marked verified |
+| Crusher, Crumbling (dungeon end) | `CrusherManager`, `DungeonEndCrumblingStep`, `DungeonEndCrusherMisc` | Final crusher and crumbling steps | 0 / 0 | muted on client; in snapshot; physics callbacks under P2 swap | 🟡 |  |
+| Torture: iron maiden | `IronMaidenDoor`, `TrapFakeDoor` | Torture room: iron maiden door | 0 / 0 | not muted; in snapshot | 🟡 |  |
+| Lights out (room) | `TrapLightsOut`, `LightsOutTrigger`, `LightsOutLever`, `LightsOutMonster` | Darkness, light lever, monster | 7 / 10 | muted; Msg.LightsOut | ✅ | light verified; the monster is a separate 🔴 in the traps section |
+| Balcony, BalconyEntrance, BalconyExit | `BalconyGenerator`, `BalconyBird`, `BalconyFakeDoor`, `BalconyDropTrigger`, `BalconyHatch`, `BalconyWindManager` …(+3) | Outer wall: windows, birds, trap doors, wind, hatch | 4 / 3 | muted (bird, door, drop zone); seeded (generator, wind); in snapshot | ✅ | 458/458 objects (PLAN 12.10); depth layers are shared (README) |
+| LabHUB, LabRegular, LabKey, LabExit | `LabHubManager`, `LabAlarm`, `PatrolingEnemy`, `PatrolingEnemyUtilities`, `LabEnemyStates` | Laboratory: multi-layer hub, patrols, per-layer alarm | 0 / 29 | AI targets the nearest (Enemy.Update); the depth layer is shared | 🔴 | the static CurrentPlayerLayer is one for both |
+| Cave, CaveUnique | `CaveMadnessTrigger`, `CaveDoorSwitcher`, `MonsterCaveSpot`, `CaveConfiguration`, `MonsterSpawnSpot` | Caves after the tower: madness, monsters, doors | 2 / 0 | seeded (CaveSeedPatch) | 🟡 | "awaiting verification" (PLAN); queue task E |
+| SewerEntrance, SewerExit | `DrippingPipe`, `Critters`, `Snail`, `Rat`, `BaseAnimal` | Sewer: decor and small creatures; logic is RoomGenerator flags | 0 / 0 | seeded (shared seed); decor is not registered | 🟡 | there are no dedicated sewer classes |
+| TowerExit, EndGameSpawn, tower exit | `EndgameExitroomTrigger`, `ExitAutomatHelper`, `EndgameSettings`, `EveliusBasement` | Tower exit, final spawn, Evelius's heart in hand | 6 / 0 | not muted; the heart is looked up on GM.Player | 🔴 | the heart is looked up only in slot0's hands |
+| Tutorial | `TutorialEvelius`, `CommandEvents`, `IntroHelper`, `SkipIntro` | Tutorial scene and hints | 3 / 0 | none | 🟡 | not needed for P2; CommandEvents.m_player = GM.Player |
+| ConnectRoomStart, ConnectRoomTarget | `RoomGenerator` | Connecting rooms between segments | 7 / 0 | seeded | 🟡 | in the generator, not verified separately |
+| Head rooms: ItemVault, Pawnshop, PillarWalk, BarberShop, HairMirror | `VonWanstHeadManager`, `ItemVault`, `PillarWalk`, `HeadRoom`, `HeadRoomPedestal`, `HeadroomExitDoor` …(+3) | The player goes into "Vanst's head" with a copy for a limited time | 18 / 9 | none (single manager, disables slot0) | 🔴 | disables Player.CurrentPlayer, replaces GM.Player with a copy |
+| Hideouts (HideOut) | `HideOut`, `HideoutSpecialItem` | Hide in a barrel/wardrobe, companions come out nearby | 3 / 1 | P2 swap on trigger | 🟡 |  |
+| Mirror platform | `MirrorPlatform` | The mirror platform works when a player enters | 0 / 0 | P2 swap (physics callbacks) | 🟡 | "mirror for the host only" — phase 3, not marked verified |
 
-## 3. NPC и диалоги
+## 3. NPCs and dialogues
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| База диалогов: DialogueTrigger + DialogueManager | `DialogueTrigger`, `DialogueManager`, `TalkCommand`, `FirstOptionCommand`, `SecondOptionCommand`, `ThirdOptionCommand` | Триггер NPC ставит себя в очередь менеджера и открывает меню | 15 / 14 | подмена P2 (колбэки, Update менеджера P2); Talk пересылается | 🔴 | триггер кэширует DialogueManager P1 (Awake/Start) |
-| Окно выбора (InteractionWindow) | `InteractionWindow` | Меню 1/2/3: диалоги, магазины, джинн, банк | 1 / 12 | пересылается (Msg.Window); локальное открытие у клиента глушится | ✅ | открытие и закрытие у клиента — автотест 12.10 |
-| Реплики: субтитры и голос | `CharacterAudioComponents`, `TextboxPositionHandler`, `ReparentTextbox` | Реплики над головой, озвучка | 2 / 0 | пересылается (Msg.Talk); клиент свои не запускает | 🟡 | DialogueManager.Initialize у P2 вызывается при GM.Player = P1 |
-| Автоматы: Automat, AutomatenManager | `Automat`, `AutomatenManager`, `AutomatWindowAnimation`, `PriceTagValue` | Торговый автомат: рычаг, цена, выдача предмета | 3 / 0 | рычаг глушится у клиента; удар P2 под подменой; товар и цена не сидированы | 🟡 | Task A (оплата P2) в очереди; клиент может видеть другой товар |
-| Ломбард (Pawnshop) | `Pawnshop`, `PawnshopMain`, `PawnshopSell`, `PawnshopDisplayItems`, `Pawnshopevents`, `PawnshopBaseItems` | Продажа и выкуп предметов, оценка, оплата монетами | 36 / 0 | подмена P2 в триггере/окне; кэш менеджера как у базы | 🔴 | меню и оплата могут уйти в окно и кошель P1 |
-| Парикмахер (Barber) | `Barber` | Стрижка и борода за монеты, купон | 27 / 0 | подмена P2 в триггере/окне | 🔴 | причёска и оплата берутся у GM.Player |
-| Трубочист: Pipefitter, PipeSystem | `Pipefitter`, `PipeSystem`, `PipeSystemManager` | Платная доставка предмета по трубной сети | 21 / 0 | подмена P2; PipeSystem.m_player = GM.Player | 🔴 | оплата и кэш игрока у P1 |
-| Банкир, банкомат, монеты | `Banker`, `ATMLogic`, `MoneyTrigger`, `DropAllCoinsDialogue` | Вклад в банк, пузырь монет, бросок всех монет | 14 / 14 | подмена P2; MoneyTrigger показывает кошель GM.Player | 🟡 | пузырь и текст монет — по P1 |
-| Мэр, бармен, жители деревни | `Mayor`, `Barkeeper`, `Bard`, `AlvaVillage`, `SobuVillage`, `HubertsMom` …(+8) | Деревенские NPC: налог, питьё, музыка, квесты, татуировки | 108 / 0 | подмена P2; риск базы диалогов | 🟡 | до 27 GM.Player на класс; прогресс села — по P1 |
-| Загадочник (RiddleMaster) | `RiddleMaster`, `RiddleMasterAction`, `RiddleMasterUtilities`, `RiddleDatabase` | Загадки с призом | 9 / 1 | подмена P2; вопросы Random | 🟡 |  |
-| Зеркало-собеседник (MirrorTalk) | `MirrorTalk` | Реплика зеркала, вход в head-комнату зеркала | 7 / 0 | подмена P2 | 🟡 | ведёт в head-комнату (см. раздел 2) |
-| Джинн и лампа | `DjinnData`, `MagicLampSpecialItem` | Лампа вызывает джинна: желания, обезьяна, хранилище | 16 / 0 | подмена P2; TransformAction под подменой | 🟡 | «джинн для второго» — фазы 3/5, вживую не проверен |
-| Хижина и сейв предметов | `PlayerHutItemSave`, `WanstHouseHandler`, `HouseUpgradeHelper`, `ItemListCurator` | Предметы в хижине, улучшения дома | 10 / 0 | сейв клиента отключён; сейв хоста — по GM.Player | 🔴 | сохраняет инвентарь только P1 |
+| Dialogue base: DialogueTrigger + DialogueManager | `DialogueTrigger`, `DialogueManager`, `TalkCommand`, `FirstOptionCommand`, `SecondOptionCommand`, `ThirdOptionCommand` | The NPC trigger queues itself in the manager and opens the menu | 15 / 14 | P2 swap (callbacks, P2 manager's Update); Talk is forwarded | 🔴 | the trigger caches P1's DialogueManager (Awake/Start) |
+| Choice window (InteractionWindow) | `InteractionWindow` | Menu 1/2/3: dialogues, shops, djinn, bank | 1 / 12 | forwarded (Msg.Window); local opening is muted on the client | ✅ | opening and closing on the client — autotest 12.10 |
+| Lines: subtitles and voice | `CharacterAudioComponents`, `TextboxPositionHandler`, `ReparentTextbox` | Lines above the head, voice-over | 2 / 0 | forwarded (Msg.Talk); the client does not start its own | 🟡 | DialogueManager.Initialize for P2 is called while GM.Player = P1 |
+| Vending machines: Automat, AutomatenManager | `Automat`, `AutomatenManager`, `AutomatWindowAnimation`, `PriceTagValue` | Vending machine: lever, price, item dispensing | 3 / 0 | lever is muted on the client; P2's hit under swap; item and price are not seeded | 🟡 | Task A (P2 payment) is in the queue; the client may see a different item |
+| Pawnshop | `Pawnshop`, `PawnshopMain`, `PawnshopSell`, `PawnshopDisplayItems`, `Pawnshopevents`, `PawnshopBaseItems` | Selling and buying back items, appraisal, payment in coins | 36 / 0 | P2 swap in the trigger/window; manager cache as in the base | 🔴 | the menu and payment may go to P1's window and purse |
+| Barber | `Barber` | Haircut and beard for coins, coupon | 27 / 0 | P2 swap in the trigger/window | 🔴 | hairstyle and payment are taken from GM.Player |
+| Pipefitter: Pipefitter, PipeSystem | `Pipefitter`, `PipeSystem`, `PipeSystemManager` | Paid item delivery over the pipe network | 21 / 0 | P2 swap; PipeSystem.m_player = GM.Player | 🔴 | payment and player cache are P1's |
+| Banker, ATM, coins | `Banker`, `ATMLogic`, `MoneyTrigger`, `DropAllCoinsDialogue` | Bank deposit, coin bubble, dropping all coins | 14 / 14 | P2 swap; MoneyTrigger shows GM.Player's purse | 🟡 | bubble and coin text are P1's |
+| Mayor, bartender, villagers | `Mayor`, `Barkeeper`, `Bard`, `AlvaVillage`, `SobuVillage`, `HubertsMom` …(+8) | Village NPCs: tax, drinks, music, quests, tattoos | 108 / 0 | P2 swap; dialogue base risk | 🟡 | up to 27 GM.Player per class; village progress is P1's |
+| Riddle master (RiddleMaster) | `RiddleMaster`, `RiddleMasterAction`, `RiddleMasterUtilities`, `RiddleDatabase` | Riddles with a prize | 9 / 1 | P2 swap; questions use Random | 🟡 |  |
+| Mirror talker (MirrorTalk) | `MirrorTalk` | The mirror's line, entry to the mirror's head room | 7 / 0 | P2 swap | 🟡 | leads to a head room (see section 2) |
+| Djinn and lamp | `DjinnData`, `MagicLampSpecialItem` | The lamp summons a djinn: wishes, monkey, storage | 16 / 0 | P2 swap; TransformAction under swap | 🟡 | "djinn for the second player" — phases 3/5, not verified live |
+| Hut and item save | `PlayerHutItemSave`, `WanstHouseHandler`, `HouseUpgradeHelper`, `ItemListCurator` | Items in the hut, house upgrades | 10 / 0 | the client's save is disabled; the host's save uses GM.Player | 🔴 | saves only P1's inventory |
 
-## 4. Злой маг Эвелиус
+## 4. Evil mage Evelius
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| EveliusController | `EveliusController` | Эвелиус в хабах: появление, настроение, диалоги, задания | 12 / 6 | глушится у клиента; в снапшоте; лишний у клиента удаляется | 🔴 | m_player = GM.Player: собеседник один |
-| Задания, настроение, болтовня | `EvTasks`, `EvReturn`, `EvSmalltalk`, `EvMediumMood`, `EvAnyMood`, `EvGiveItem` …(+2) | Задания, возврат предметов, награда и наказание | 35 / 1 | хост; отдельно не глушится | 🔴 | монеты и вещи списываются у GM.Player |
-| EveliusHunter: охота | `EveliusHunter`, `HunterActions`, `HunterMovement`, `HunterCloud`, `HunterAnimationEvents` | Охотник гонится за игроком и принцессой | 21 / 9 | глушится как FlyingBehaviour; цель в Update — ближайший | 🔴 | FixedUpdate, атака, реплики — по CurrentPlayer |
-| Сердце Эвелиуса и финал | `EveliusHeartSpecialItem`, `FinalEvelius`, `RuinEvelius`, `EveliusDropArea` | Сердце, финальная башня, руины, бой с Эвелиусом | 37 / 0 | ScenePatches везёт P2 в FinalTower; логики P2 нет | 🔴 | 31 GM.Player; бой и сцена — slot0 |
-| Зелье и тело Эвелиуса | `EveliusPotion` | Превращает в Эвелиуса (Status.Evelius) | 0 / 0 | TransformAction под подменой P2 | 🟡 | вживую не проверялось |
+| EveliusController | `EveliusController` | Evelius in hubs: appearance, mood, dialogues, tasks | 12 / 6 | muted on client; in snapshot; the extra one on the client is removed | 🔴 | m_player = GM.Player: only one conversation partner |
+| Tasks, mood, small talk | `EvTasks`, `EvReturn`, `EvSmalltalk`, `EvMediumMood`, `EvAnyMood`, `EvGiveItem` …(+2) | Tasks, item return, reward and punishment | 35 / 1 | host; not muted separately | 🔴 | coins and items are deducted from GM.Player |
+| EveliusHunter: the hunt | `EveliusHunter`, `HunterActions`, `HunterMovement`, `HunterCloud`, `HunterAnimationEvents` | The hunter chases the player and the princess | 21 / 9 | muted like FlyingBehaviour; the target in Update is the nearest | 🔴 | FixedUpdate, attack, lines — by CurrentPlayer |
+| Evelius's heart and the finale | `EveliusHeartSpecialItem`, `FinalEvelius`, `RuinEvelius`, `EveliusDropArea` | The heart, the final tower, the ruins, the fight with Evelius | 37 / 0 | ScenePatches takes P2 to FinalTower; no P2 logic | 🔴 | 31 GM.Player; fight and scene — slot0 |
+| Evelius's potion and body | `EveliusPotion` | Turns you into Evelius (Status.Evelius) | 0 / 0 | TransformAction under P2 swap | 🟡 | not verified live |
 
-## 5. Компаньоны
+## 5. Companions
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| Следование и ИИ (NPC + HandleFollow) | `NPC`, `CharacterUtilities` | Идёт за игроком, ждёт, прыгает по слоям | 30 / 107 | клиент: глушится; хост: без подмены (подмена только у злых NPC) | 🔴 | все идут за Player.VonWansts[0] = P1 |
-| Разговор и набор в группу | `CompanionDialogueTrigger` | Окно «следуй/стой», подарки, лояльность, освобождение | 16 / 43 | подмена P2 (меню); окно пересылается | 🔴 | группа P2 не та, за кем идёт ИИ (43 CurrentPlayer) |
-| Автомат компаньонов | `CompanionAutomat`, `CompanionSpawnSpot` | Покупка компаньона за монеты | 3 / 0 | рычаг глушится; оплата под подменой P2 | 🟡 |  |
-| Принцесса | `PrincessAction`, `PrincessUtilities`, `PrincessVillage` | Компаньон-принцесса: поедание, спасение, реплики | 5 / 12 | нет (AI привязан к CurrentPlayer) | 🔴 | 8+4 CurrentPlayer, поведение по slot0 |
-| Перенос компаньонов при смене комнат | `EnterDoorCommand`, `CoopTransitions` | Телепорт компаньонов к игроку при переходе | 9 / 2 | CoopTransitions: переход исполняет P1, P2 переносится позже | 🟡 | TeleportCompanionsToPlayer идёт от P1; группа P2 не проверялась |
-| Обезвреживание ловушек компаньонами | `UseTrapSpot`, `MultiDismantle`, `CompanionBalconyTrap` | Компаньон обезвреживает ловушку по метке | 1 / 0 | UseTrapSpot и MultiDismantle глушатся у клиента | 🟡 | ловушка спутника только у хоста (0.3.4) |
+| Following and AI (NPC + HandleFollow) | `NPC`, `CharacterUtilities` | Follows the player, waits, jumps between layers | 30 / 107 | client: muted; host: no swap (swap only for evil NPCs) | 🔴 | everyone follows Player.VonWansts[0] = P1 |
+| Conversation and recruiting | `CompanionDialogueTrigger` | "Follow/stay" window, gifts, loyalty, release | 16 / 43 | P2 swap (menu); window is forwarded | 🔴 | P2's group is not the one the AI follows (43 CurrentPlayer) |
+| Companion vending machine | `CompanionAutomat`, `CompanionSpawnSpot` | Buying a companion for coins | 3 / 0 | lever is muted; payment under P2 swap | 🟡 |  |
+| Princess | `PrincessAction`, `PrincessUtilities`, `PrincessVillage` | Princess companion: eating, rescue, lines | 5 / 12 | none (AI is bound to CurrentPlayer) | 🔴 | 8+4 CurrentPlayer, behavior follows slot0 |
+| Moving companions on room change | `EnterDoorCommand`, `CoopTransitions` | Teleports companions to the player on transition | 9 / 2 | CoopTransitions: P1 executes the transition, P2 is carried over later | 🟡 | TeleportCompanionsToPlayer runs from P1; P2's group was not verified |
+| Companions disarming traps | `UseTrapSpot`, `MultiDismantle`, `CompanionBalconyTrap` | A companion disarms a trap at a marker | 1 / 0 | UseTrapSpot and MultiDismantle are muted on the client | 🟡 | the companion's trap works on the host only (0.3.4) |
 
-## 6. Особые предметы и зелья
+## 6. Special items and potions
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| Монеты и кошель | `CoinSpecialItem`, `GoldSack`, `GoldSackSpecialItem`, `GoldStash`, `FillGoldSack` | Кошель на 20 монет, подбор, бросок | 12 / 38 | подмена P2 (GoldSack*, Coin Equip) | 🟡 | Task A/B очереди: оплата и передача монет |
-| Броня, шлем, щит, манекен | `ArmorSpecialItem`, `HelmetSpecialItem`, `ShieldSpecialItem`, `MannequinSpecialItem`, `HatStandSpecialItem`, `HaircutBustSpecialItem` | Надеваемые предметы | 0 / 0 | подмена P2 (Update предмета на объекте P2) | 🟡 |  |
-| Улей-шлем | `HiveSpecialItem` | Пчёлы жалят носителя | 5 / 2 | подмена P2 при ношении | 🔴 | Awake: m_character = CurrentPlayer (P1) |
-| Банановая кожура | `TrapItemBananaPeel`, `NutritiousSpecialItem` | Скользкая кожура, скольжение в корутине | 9 / 2 | подмена P2 (корутины) | ✅ | банан на втором заканчивается — проверено (PLAN, фаза 3) |
-| Капканы, мышеловка, грабли, гусь | `TrapItemBearTrap`, `TrapItemMouseTrap`, `TrapItemRake`, `TrapItemHonk` | Предметы-ловушки | 0 / 2 | подмена P2 (колбэки) | 🟡 | `hitFrom == null → CurrentPlayer` |
-| Взрывоопасное растение | `TrapItemExplosivePlant` | Взрыв по расстоянию до игрока | 4 / 1 | подмена P2 | 🟡 | радиус считается от CurrentPlayer |
-| Палочки и заклинания | `MagicWandSpecialItem`, `MagicDevWandSpecialItem`, `RangedSpecialItem`, `SpellSpecialItem`, `SpellHelper` | Заклинания, дальняя атака | 0 / 12 | подмена P2 (предмет в руке) | 🟡 | 12 CurrentPlayer на палочку |
-| Песочные часы | `HourglassSpecialitem`, `HeadroomHourglass` | Часы head-комнаты | 4 / 0 | нет | 🟡 | привязаны к head-комнате |
-| Бутылка возрождения | `RespawnBottleSpecialItem`, `RespawnSettings`, `RespawnBottleBurner` | Возрождает на месте бутылки (RespawnSettings глобальный) | 1 / 1 | нет (чинится только слот при OnEnable) | 🔴 | RespawnRoutine пересоздаёт slot0 (CODE_MAP) |
-| Зубы, молот, липкие, твёрдая еда | `ToothSpecialItem`, `Tooth`, `HammerSpecialItem`, `StickySpecialItem`, `HardFoodSpecialItem` | Зубы-«жизни», молоток, липкий предмет, еда | 0 / 0 | подмена P2 | 🟡 |  |
-| Читаемые предметы, пророчества | `ReadableSpecialItem`, `ProphecyScrollSpecialItem`, `ProphecyLibrary`, `ReadProphecyHint` | Свитки и пророчества | 1 / 18 | подмена P2 | 🟡 |  |
-| Зелья-головоломки | `PuzzlePotion`, `AntiPotion`, `DamagePotion`, `DeathPotion`, `GooPotion`, `LockengoldPotion` | Бросаемые зелья: урон, слизь, золото, противоядие | 0 / 4 | подмена P2 (бросок из руки) | 🟡 | луч броска берёт localScale CurrentPlayer |
-| Превращение: зелье-монстр | `TransformationPotion`, `TransformTo` | Тело игрока заменяется монстром | 0 / 0 | TransformAction под подменой + AdoptAsSecond; клиент создаёт марионетку | ✅ | «монстр, клиент им ходит» — проверено (PLAN, фаза 5) |
-| Превращения: джинн (обезьяна), прислужник | `VonWanstHeadManager`, `CharacterAction` | Обезьяна или слуга вместо игрока | 66 / 112 | TransformAction под подменой P2 | 🟡 | фаза 5, вживую не проверены |
+| Coins and purse | `CoinSpecialItem`, `GoldSack`, `GoldSackSpecialItem`, `GoldStash`, `FillGoldSack` | A 20-coin purse, pickup, throwing | 12 / 38 | P2 swap (GoldSack*, Coin Equip) | 🟡 | queue Tasks A/B: payment and coin transfer |
+| Armor, helmet, shield, mannequin | `ArmorSpecialItem`, `HelmetSpecialItem`, `ShieldSpecialItem`, `MannequinSpecialItem`, `HatStandSpecialItem`, `HaircutBustSpecialItem` | Wearable items | 0 / 0 | P2 swap (the item's Update on P2's object) | 🟡 |  |
+| Hive helmet | `HiveSpecialItem` | Bees sting the wearer | 5 / 2 | P2 swap while worn | 🔴 | Awake: m_character = CurrentPlayer (P1) |
+| Banana peel | `TrapItemBananaPeel`, `NutritiousSpecialItem` | Slippery peel, sliding in a coroutine | 9 / 2 | P2 swap (coroutines) | ✅ | the banana on the second player ends — verified (PLAN, phase 3) |
+| Bear traps, mousetrap, rake, goose | `TrapItemBearTrap`, `TrapItemMouseTrap`, `TrapItemRake`, `TrapItemHonk` | Trap items | 0 / 2 | P2 swap (callbacks) | 🟡 | `hitFrom == null → CurrentPlayer` |
+| Explosive plant | `TrapItemExplosivePlant` | Explosion based on distance to the player | 4 / 1 | P2 swap | 🟡 | the radius is computed from CurrentPlayer |
+| Wands and spells | `MagicWandSpecialItem`, `MagicDevWandSpecialItem`, `RangedSpecialItem`, `SpellSpecialItem`, `SpellHelper` | Spells, ranged attack | 0 / 12 | P2 swap (item in hand) | 🟡 | 12 CurrentPlayer per wand |
+| Hourglass | `HourglassSpecialitem`, `HeadroomHourglass` | Head room timer | 4 / 0 | none | 🟡 | tied to the head room |
+| Respawn bottle | `RespawnBottleSpecialItem`, `RespawnSettings`, `RespawnBottleBurner` | Respawns at the bottle's location (RespawnSettings is global) | 1 / 1 | none (only the slot is fixed on OnEnable) | 🔴 | RespawnRoutine recreates slot0 (CODE_MAP) |
+| Teeth, hammer, sticky, hard food | `ToothSpecialItem`, `Tooth`, `HammerSpecialItem`, `StickySpecialItem`, `HardFoodSpecialItem` | Teeth as "lives", hammer, sticky item, food | 0 / 0 | P2 swap | 🟡 |  |
+| Readable items, prophecies | `ReadableSpecialItem`, `ProphecyScrollSpecialItem`, `ProphecyLibrary`, `ReadProphecyHint` | Scrolls and prophecies | 1 / 18 | P2 swap | 🟡 |  |
+| Puzzle potions | `PuzzlePotion`, `AntiPotion`, `DamagePotion`, `DeathPotion`, `GooPotion`, `LockengoldPotion` | Throwable potions: damage, goo, gold, antidote | 0 / 4 | P2 swap (throw from the hand) | 🟡 | the throw ray takes CurrentPlayer's localScale |
+| Transformation: monster potion | `TransformationPotion`, `TransformTo` | The player's body is replaced by a monster | 0 / 0 | TransformAction under swap + AdoptAsSecond; the client creates a puppet | ✅ | "monster, the client walks as it" — verified (PLAN, phase 5) |
+| Transformations: djinn (monkey), minion | `VonWanstHeadManager`, `CharacterAction` | A monkey or servant instead of the player | 66 / 112 | TransformAction under P2 swap | 🟡 | phase 5, not verified live |
 
-## 7. Смерть и воскрешение
+## 7. Death and revival
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| Смерть P2 при живом P1 | `CharacterAction`, `CharacterStats` | Забег продолжается, труп остаётся | 62 / 110 | подмена GetDamaged/Die; DeathPatches | 🟡 |  |
-| Смерть P1 при живом P2 | `GameManager`, `CoopPlayers` | P2 становится главным (PromoteSecondToMain) | 0 / 28 | CoopPlayers.PromoteSecondToMain; камера и туман | 🟡 |  |
-| Смерть обоих, Game over, похороны | `FuneralEndscreen`, `VillageManager`, `UIManager` | Конец забега, экран смерти | 13 / 0 | ShowDeathUI/Funeral глушатся при живом напарнике; клиент — GameOver по сети | 🟡 |  |
-| Воскрешение (мод): убийства или новый этаж | `CoopLife` | Погибший воскресает после N убийств или на новом этаже | 0 / 0 | мод; счётчик на хосте | 🟡 | в PLAN проверенным не назван |
-| Камера, туман, свет клиента после смерти | `CameraManager`, `UberFogSystem`, `CoopCamera` | Камера и свет следуют за выжившим | 17 / 1 | SetCurrent: «игрок» = напарник | 🟡 | фаза 4: сделано, не проверено |
+| P2's death while P1 is alive | `CharacterAction`, `CharacterStats` | The run continues, the corpse stays | 62 / 110 | GetDamaged/Die swap; DeathPatches | 🟡 |  |
+| P1's death while P2 is alive | `GameManager`, `CoopPlayers` | P2 becomes the main player (PromoteSecondToMain) | 0 / 28 | CoopPlayers.PromoteSecondToMain; camera and fog | 🟡 |  |
+| Both die, Game over, funeral | `FuneralEndscreen`, `VillageManager`, `UIManager` | End of the run, death screen | 13 / 0 | ShowDeathUI/Funeral are muted while the partner is alive; client — GameOver over the network | 🟡 |  |
+| Revival (mod): kills or a new floor | `CoopLife` | The dead player revives after N kills or on a new floor | 0 / 0 | mod; the counter is on the host | 🟡 | not named verified in PLAN |
+| Client camera, fog and light after death | `CameraManager`, `UberFogSystem`, `CoopCamera` | Camera and light follow the survivor | 17 / 1 | SetCurrent: the "player" = the partner | 🟡 | phase 4: done, not verified |
 
-## 8. Деревня
+## 8. Village
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| Сцены: башня, деревня, финал | `SceneLoader`, `VillageManager`, `GameManager` | Переход по двери, загрузка сцены, перенос игроков | 0 / 28 | ScenePatches: DontDestroyOnLoad(P2); SceneLoad пересылается | 🟡 | сейв клиента отключён |
-| Налоги, сейвы села, дом | `VillageData`, `DataManager`, `HouseUpgradeHelper`, `WanstHouseHandler` | Прогресс деревни, дом, налоги мэра | 0 / 0 | сейв клиента отключён; хост — по игре | 🟡 | инвентарь в сейве только P1 |
+| Scenes: tower, village, finale | `SceneLoader`, `VillageManager`, `GameManager` | Transition via door, scene loading, carrying over players | 0 / 28 | ScenePatches: DontDestroyOnLoad(P2); SceneLoad is forwarded | 🟡 | the client's save is disabled |
+| Taxes, village saves, house | `VillageData`, `DataManager`, `HouseUpgradeHelper`, `WanstHouseHandler` | Village progress, house, the mayor's taxes | 0 / 0 | the client's save is disabled; host — as in the game | 🟡 | inventory in the save is P1's only |
 
-## 9. Концовки и катсцены
+## 9. Endings and cutscenes
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| Концовки: трон, пещера монстра, бар, похороны | `ThroneEndscreen`, `FuneralEndscreen`, `MonsterCave`, `Barkeeper`, `HubertThrone` | Скриптовые концовки, двигают игрока | 28 / 0 | клиент получает SceneLoad/GameOver; своей логики нет | 🔴 | сцена двигает только GM.Player, P2 вне сценария |
-| Видео: взрыв башни, пузырь-переход | `VideoLibrary`, `CameraManager` | Видео на камере: взрыв башни, пузырьковый переход | 9 / 1 | нет (Task D в очереди) | 🔴 | видео играет только хост |
-| Интро и заставка | `IntroHelper`, `SkipIntro`, `IdleScreen` | Вступительные ролики, режим ожидания | 1 / 0 | нет | 🟡 | вне забега |
+| Endings: throne, monster cave, bar, funeral | `ThroneEndscreen`, `FuneralEndscreen`, `MonsterCave`, `Barkeeper`, `HubertThrone` | Scripted endings that move the player | 28 / 0 | the client receives SceneLoad/GameOver; no logic of its own | 🔴 | the scene moves only GM.Player, P2 is outside the script |
+| Video: tower explosion, bubble transition | `VideoLibrary`, `CameraManager` | Video on the camera: tower explosion, bubble transition | 9 / 1 | none (Task D in the queue) | 🔴 | the video plays on the host only |
+| Intro and splash screen | `IntroHelper`, `SkipIntro`, `IdleScreen` | Intro videos, idle mode | 1 / 0 | none | 🟡 | outside a run |
 
-## 10. Достижения
+## 10. Achievements
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| AchievementManager и 102 трекера | `AchievementManager`, `AchievementData`, `EnemyDeathDummyAchievementTracker`, `BarenudleBeastAchievementTracker`, `HardyPartyAchievementTracker` | Убийства, смерти, покупки, превращения, побег | 7 / 1 | хук TrackDeath (счётчик убийств); сейв у клиента заглушён | 🟡 | учёт по CharacterTypes.Player; TrackEscape берёт GM.Player |
+| AchievementManager and 102 trackers | `AchievementManager`, `AchievementData`, `EnemyDeathDummyAchievementTracker`, `BarenudleBeastAchievementTracker`, `HardyPartyAchievementTracker` | Kills, deaths, purchases, transformations, escape | 7 / 1 | TrackDeath hook (kill counter); the client's save is muted | 🟡 | counted by CharacterTypes.Player; TrackEscape takes GM.Player |
 
-## 11. Общие системы
+## 11. Common systems
 
-| Механика | Классы | Что делает | GM / CP | Покрытие модом | Ст. | Примечание |
+| Mechanic | Classes | What it does | GM / CP | Mod coverage | St. | Notes |
 |---|---|---|---|---|---|---|
-| Двери, люк в сегмент, боковой проход | `EnterDoorCommand`, `EnterDoorTrigger`, `EnterDoorSideTrigger`, `StartNewSegmentTrigger`, `Door` | Переход: голосование, телепорт, камера | 9 / 2 | подмена P2 (голосование CoopTransitions); у клиента заглушено | ✅ | route-test проходит комнаты автоматически (TASKS) |
-| Слои глубины (LayerManager, DepthSwitch) | `LayerManager`, `DepthSwitch`, `ObjectLayerSet` | Слои глубины (балкон, лаборатория), общий CurrentPlayerLayer | 30 / 3 | нет | 🔴 | P2 на переключателе меняет слой и P1 |
-| Бой (CombatManager, детектор врагов) | `CombatManager`, `EnemyDetectionRange`, `Enemy` | Список врагов в бою, детекторы, цели ИИ | 10 / 35 | подмена: Enemy.Update → ближайший; детектор — владелец | 🟡 | CombatManager.InCombat общий: блокирует разговоры у обоих |
-| Туман (UberFog) | `UberFogSystem`, `UberFogPlayerOccluder`, `UberFogHallwayOccluder` | Туман в комнатах, прозрачность вокруг игрока | 12 / 16 | нет | 🔴 | окклюдер привязан к P1 |
-| Подсказки (HintManager) | `HintObject`, `HintManager`, `HintCollection` | Обучающие подсказки на экране | 5 / 26 | нет | 🟡 | 36 подклассов HintObject (497 CurrentPlayer суммарно) |
-| Тени и глаза | `TwoDShadow`, `TwoDShadow_outdoor`, `EyeTrackingRangeLimiter` | Тени и слежение глаз | 0 / 13 | тени не регистрируются | 🟡 | косметика |
+| Doors, segment hatch, side passage | `EnterDoorCommand`, `EnterDoorTrigger`, `EnterDoorSideTrigger`, `StartNewSegmentTrigger`, `Door` | Transition: vote, teleport, camera | 9 / 2 | P2 swap (CoopTransitions vote); muted on the client | ✅ | route-test passes rooms automatically (TASKS) |
+| Depth layers (LayerManager, DepthSwitch) | `LayerManager`, `DepthSwitch`, `ObjectLayerSet` | Depth layers (balcony, laboratory), shared CurrentPlayerLayer | 30 / 3 | none | 🔴 | P2 on a switch changes P1's layer too |
+| Combat (CombatManager, enemy detector) | `CombatManager`, `EnemyDetectionRange`, `Enemy` | List of enemies in combat, detectors, AI targets | 10 / 35 | swap: Enemy.Update → nearest; detector — the owner | 🟡 | CombatManager.InCombat is shared: blocks conversations for both |
+| Fog (UberFog) | `UberFogSystem`, `UberFogPlayerOccluder`, `UberFogHallwayOccluder` | Fog in rooms, transparency around the player | 12 / 16 | none | 🔴 | the occluder is bound to P1 |
+| Hints (HintManager) | `HintObject`, `HintManager`, `HintCollection` | Tutorial hints on screen | 5 / 26 | none | 🟡 | 36 HintObject subclasses (497 CurrentPlayer in total) |
+| Shadows and eyes | `TwoDShadow`, `TwoDShadow_outdoor`, `EyeTrackingRangeLimiter` | Shadows and eye tracking | 0 / 13 | shadows are not registered | 🟡 | cosmetic |
 
-## Топ-15 рискованных 🔴 (по важности для игрока)
+## Top 15 risky 🔴 (by importance for the player)
 
-Порядок: частота встречи в забеге × насколько ломает игру второго. Номера строк — в `decompiled/Assembly-CSharp/`. Проверка «вживую» — через dev-команды из `docs/TASKS.md` (`tp p2 x y`, `tap p2 talk|opt1|attack`, `log N <фильтр>`); здесь они не запускались.
+Order: how often it comes up in a run × how badly it breaks the game for the second player. Line numbers refer to `decompiled/Assembly-CSharp/`. Live checking is via the dev commands from `docs/TASKS.md` (`tp p2 x y`, `tap p2 talk|opt1|attack`, `log N <filter>`); they were not run here.
 
-| № | Риск | Почему ломает | Как исправить (одной фразой) | Файлы и методы игры |
+| # | Risk | Why it breaks | How to fix (in one sentence) | Game files and methods |
 |---|---|---|---|---|
-| 1 | NPC, магазины и меню для P2: триггер хранит менеджер диалогов P1 | `DialogueTrigger` кэширует `DialogueManager` первого игрока (`Awake`, `Start`), P2 попадает в очередь `OverlappingTriggers` менеджера P1; диалог после синхронного старта продолжает Update менеджера P1 вне подмены (`MustLookAtTrigger`, `CancelThis` по P1). Вероятная общая причина Task A (оплата P2 списывается у P1) | Патч геттера `DialogueTrigger.DialogueManager` (и `Awake`/`Start`): возвращать менеджер того, кто сейчас «игрок» (`GameManager.Player` под подменой), и вести очереди по игрокам; заодно вызвать `DialogueManager.Initialize` у P2 под подменой | `DialogueTrigger.cs` :106, :111–117, :134–160; `DialogueManager.cs` :369–372, :753, :831–900; `Player.cs` :72, :114; `Pawnshop*.cs`, `Barber.cs`, `Pipefitter.cs`, `Banker.cs` |
-| 2 | Компаньоны всегда идут за P1 | `NPC.Update` подменяется только для злых NPC; `HandleFollow` берёт `Player.VonWansts[0]` (P1); набранные P2 получают группу P2, но идут к P1 | Префикс `NPC.Update`: подставлять «лидера» (игрок, чья `GetCurrentPlayerGroup()` содержит NPC), для свободных — ближайшего | `NPC.cs` :258–262; `CharacterUtilities.cs` :2676–2780, :3288; `CompanionDialogueTrigger.cs` :339–348, :991–1018 |
-| 3 | Бутылка возрождения | `RespawnSettings` глобальный; `Die` планирует `RespawnRoutine`, которая пересоздаёт slot0; мод глушит только `ShowDeathUI` | Если умирает игрок кооп-пары и напарник жив — не взводить `RespawnSettings.Respawn` для этой смерти (оставить воскрешение `CoopLife`) либо спавнить возрождённого как P2 через `CoopPlayers.SpawnP2` | `CharacterAction.cs` :1584–1602, :1755, :1819; `RespawnBottleSpecialItem.cs` :46, :97; `Player.OnEnable` |
-| 4 | Молотобоец гонится только за P1 | `TrapHammerGuy` везде читает `Player.CurrentPlayer`; `Update` ловушки на хосте без подмены; `HammerGuyWall` хватает компаньонов только P1 | Обернуть `Update`/`FixedUpdate`/корутины `TrapHammerGuy` и `HammerGuyWall` в `TargetSwap.SwapTo(NearestFor(ловушка))`, как у `Enemy.Update` | `TrapHammerGuy.cs` :237, :303–355, :455, :615–:862; `HammerGuyWall.cs` :133, :244, :290 |
-| 5 | Стелс-ловушки (Sleeper, TrapSleeper, TrapBigBand) | Будятся по вводу и позиции P1, включая `Input.GetKey` его клавиш; P2 можно шуметь без реакции | Подмена на ближайшего «шумного» игрока в их `Update` и замена `Input.GetKey(CommandPattern…KeyCode)` на `PlayerInput` владельца паттерна | `Sleeper.cs` :491, :579, :657–735; `TrapSleeper.cs` :461–465; `TrapBigBand.cs` :559–608 |
-| 6 | Эвелиус: один собеседник | `EveliusController.m_player` = `GameManager.Player` при появлении; задания и списания монет — у P1; охотник атакует `CurrentPlayer` в `FixedUpdate` | Под подменой на игрока в триггере/ближайшего вести `EveliusController` (`OnTriggerEnter2D`, корутины), `EveliusHunter.FixedUpdate` — на ближайшего | `EveliusController.cs` :706, :756, :843, :1581, :1680, :1932; `EvTasks.cs` :741, :933; `EveliusHunter.cs` :256–300 |
-| 7 | Бочка с порохом | `DestroyTowerRoutine` и `SpecialItemPowderKeg` убивают `GameManager.Player` (slot0) и играют видео только у хоста | Новое сообщение `Msg.TowerExplosion` (Task D) и убийство обоих игроков по очереди | `TrapPowderKeg.cs` :317–346; `SpecialItemPowderKeg.cs` :127–164 |
-| 8 | Слои глубины общие (лаборатория, балкон) | `LayerManager.CurrentPlayerLayer` — static; переключатель слоя P2 меняет слой P1, камера и ИИ ориентируются на него | Слой на игрока (словарь) либо игнорировать переключатель, если игрок не slot0; камеру `Lab` вести по сумме обоих | `LayerManager.cs` :13, :198–231; `LabHubManager.cs` :68, :152; `LabAlarm.cs` :123; `CharacterUtilities.cs` :2665, :3391 |
-| 9 | Туман (UberFog) привязан к P1 | `UberFogPlayerOccluder` и `UberFogSystem` держат один окклюдер на `Player.CurrentPlayer`; у P2 вокруг тела туман сплошной | Второй окклюдер для P2 (клон `Components.UberFogPlayerOccluder`) и регистрация в `UberFogSystem` | `UberFogPlayerOccluder.cs` :86, :136–156, :195–246; `UberFogSystem.cs` :327–357 |
-| 10 | Инвентарь и хижина только у P1 | Сейв и перенос между сценами берут `GetPlayerInventory()` у `GameManager.Player`; `PlayerHutItemSave` — тоже | Второй слот инвентаря в `GameData` для P2 либо запись предметов P2 при выходе из башни | `GameManager.cs` :733, :758, :1116; `EnterDoorCommand.cs` :173; `PlayerHutItemSave.cs` |
-| 11 | Head-комнаты (хранилище джинна, Эвелиус, ломбард, парикмахер, зеркало) | `VonWanstHeadManager` отключает `Player.CurrentPlayer`, подменяет `GameManager.Player` копией и возвращает; одиночный менеджер | Запретить вход, пока P2 жив, либо заморозить напарника и вести вход/выход под одной подменой с камерой на вошедшего | `VonWanstHeadManager.cs` :264–273, :337, :405–414; `Djinn.cs` :427; `EvSmalltalk.cs` :38–40 |
-| 12 | Финал: сердце Эвелиуса и FinalTower | Проверка сердца и загрузка финала идут по `GameManager.Player`; скриптовые концовки двигают только его | Выполнять `EveliusHeartSpecialItem`, `EndgameExitroomTrigger`, `ThroneEndscreen` под подменой на владельца сердца, P2 переносить и замораживать | `EveliusHeartSpecialItem.cs` :224–257, :337–345; `EndgameExitroomTrigger.cs` :74–77; `ThroneEndscreen.cs` :104–119 |
-| 13 | Всасывающая труба и трубная сеть | `SuctionPipe` затягивает `GameManager.Player`; `PipeSystem.m_player` кэширует P1 | Запоминать вошедшего персонажа и вести затягивание/оплату под его подменой | `SuctionPipe.cs` :198, :246, :306; `PipeSystem.cs` :133 |
-| 14 | Монстр темноты и смерть по `LightsOut` | `LightsOutMonster.m_currentPlayer` кэширует P1; `TrapLightsOut` убивает/замораживает `GameManager.Player` | Жертва — игрок в тёмной комнате/ближайший; вызывать эти методы под подменой жертвы | `LightsOutMonster.cs` :150, :210; `TrapLightsOut.cs` :394–431 |
-| 15 | Автоматы: товар и цена не сидированы | `Automat.Initialize` выбирает товар `WeightedElement.GetRandomElement` и скидку без сида; у клиента табличка и цена могут отличаться от выдачи хоста | Добавить `Automat`, `AutomatenManager`, `CompanionAutomat` в `RandomizerPatches.s_types` | `Automat.cs` :264, :286, :423; `AutomatenManager.cs` :100–177; `CompanionAutomat.cs` :136 |
+| 1 | NPCs, shops and menus for P2: the trigger stores P1's dialogue manager | `DialogueTrigger` caches the first player's `DialogueManager` (`Awake`, `Start`), P2 ends up in the `OverlappingTriggers` queue of P1's manager; after a synchronous start the dialogue is continued by P1's manager Update outside the swap (`MustLookAtTrigger`, `CancelThis` by P1). The likely common cause of Task A (P2's payment is deducted from P1) | Patch the `DialogueTrigger.DialogueManager` getter (and `Awake`/`Start`): return the manager of whoever is currently the "player" (`GameManager.Player` under the swap) and keep queues per player; also call `DialogueManager.Initialize` for P2 under the swap | `DialogueTrigger.cs` :106, :111–117, :134–160; `DialogueManager.cs` :369–372, :753, :831–900; `Player.cs` :72, :114; `Pawnshop*.cs`, `Barber.cs`, `Pipefitter.cs`, `Banker.cs` |
+| 2 | Companions always follow P1 | `NPC.Update` is swapped only for evil NPCs; `HandleFollow` takes `Player.VonWansts[0]` (P1); companions recruited by P2 get P2's group but walk to P1 | Prefix `NPC.Update`: substitute the "leader" (the player whose `GetCurrentPlayerGroup()` contains the NPC), the nearest one for free NPCs | `NPC.cs` :258–262; `CharacterUtilities.cs` :2676–2780, :3288; `CompanionDialogueTrigger.cs` :339–348, :991–1018 |
+| 3 | Respawn bottle | `RespawnSettings` is global; `Die` schedules `RespawnRoutine`, which recreates slot0; the mod mutes only `ShowDeathUI` | If a co-op pair member dies and the partner is alive, do not arm `RespawnSettings.Respawn` for that death (keep `CoopLife` revival), or spawn the respawned one as P2 via `CoopPlayers.SpawnP2` | `CharacterAction.cs` :1584–1602, :1755, :1819; `RespawnBottleSpecialItem.cs` :46, :97; `Player.OnEnable` |
+| 4 | The hammer guy chases only P1 | `TrapHammerGuy` reads `Player.CurrentPlayer` everywhere; the trap's `Update` on the host runs without the swap; `HammerGuyWall` grabs only P1's companions | Wrap `Update`/`FixedUpdate`/coroutines of `TrapHammerGuy` and `HammerGuyWall` in `TargetSwap.SwapTo(NearestFor(trap))`, as with `Enemy.Update` | `TrapHammerGuy.cs` :237, :303–355, :455, :615–:862; `HammerGuyWall.cs` :133, :244, :290 |
+| 5 | Stealth traps (Sleeper, TrapSleeper, TrapBigBand) | Woken by P1's input and position, including `Input.GetKey` of its keys; P2 can make noise with no reaction | Swap to the nearest "noisy" player in their `Update` and replace `Input.GetKey(CommandPattern…KeyCode)` with the `PlayerInput` of the pattern's owner | `Sleeper.cs` :491, :579, :657–735; `TrapSleeper.cs` :461–465; `TrapBigBand.cs` :559–608 |
+| 6 | Evelius: a single conversation partner | `EveliusController.m_player` = `GameManager.Player` at spawn; tasks and coin deductions are P1's; the hunter attacks `CurrentPlayer` in `FixedUpdate` | Run `EveliusController` (`OnTriggerEnter2D`, coroutines) under a swap to the player in the trigger/the nearest, and `EveliusHunter.FixedUpdate` to the nearest | `EveliusController.cs` :706, :756, :843, :1581, :1680, :1932; `EvTasks.cs` :741, :933; `EveliusHunter.cs` :256–300 |
+| 7 | Powder keg | `DestroyTowerRoutine` and `SpecialItemPowderKeg` kill `GameManager.Player` (slot0) and play the video on the host only | A new message `Msg.TowerExplosion` (Task D) and killing both players in turn | `TrapPowderKeg.cs` :317–346; `SpecialItemPowderKeg.cs` :127–164 |
+| 8 | Depth layers are shared (laboratory, balcony) | `LayerManager.CurrentPlayerLayer` is static; P2's layer switch changes P1's layer, the camera and AI follow it | A per-player layer (dictionary), or ignore the switch if the player is not slot0; drive the `Lab` camera by the sum of both | `LayerManager.cs` :13, :198–231; `LabHubManager.cs` :68, :152; `LabAlarm.cs` :123; `CharacterUtilities.cs` :2665, :3391 |
+| 9 | Fog (UberFog) is bound to P1 | `UberFogPlayerOccluder` and `UberFogSystem` hold a single occluder on `Player.CurrentPlayer`; around P2's body the fog is solid | A second occluder for P2 (a clone of `Components.UberFogPlayerOccluder`) and registration in `UberFogSystem` | `UberFogPlayerOccluder.cs` :86, :136–156, :195–246; `UberFogSystem.cs` :327–357 |
+| 10 | Inventory and hut are P1's only | The save and the carry-over between scenes take `GetPlayerInventory()` from `GameManager.Player`; `PlayerHutItemSave` too | A second inventory slot in `GameData` for P2, or record P2's items on leaving the tower | `GameManager.cs` :733, :758, :1116; `EnterDoorCommand.cs` :173; `PlayerHutItemSave.cs` |
+| 11 | Head rooms (djinn vault, Evelius, pawnshop, barber, mirror) | `VonWanstHeadManager` disables `Player.CurrentPlayer`, replaces `GameManager.Player` with a copy and restores it; a single manager | Forbid entry while P2 is alive, or freeze the partner and run entry/exit under one swap with the camera on whoever entered | `VonWanstHeadManager.cs` :264–273, :337, :405–414; `Djinn.cs` :427; `EvSmalltalk.cs` :38–40 |
+| 12 | Finale: Evelius's heart and FinalTower | The heart check and the finale loading go by `GameManager.Player`; scripted endings move only it | Run `EveliusHeartSpecialItem`, `EndgameExitroomTrigger`, `ThroneEndscreen` under a swap to the heart's owner, carry P2 over and freeze them | `EveliusHeartSpecialItem.cs` :224–257, :337–345; `EndgameExitroomTrigger.cs` :74–77; `ThroneEndscreen.cs` :104–119 |
+| 13 | Suction pipe and the pipe network | `SuctionPipe` sucks in `GameManager.Player`; `PipeSystem.m_player` caches P1 | Remember the character who entered and run the suction/payment under their swap | `SuctionPipe.cs` :198, :246, :306; `PipeSystem.cs` :133 |
+| 14 | Monster in the dark and death by `LightsOut` | `LightsOutMonster.m_currentPlayer` caches P1; `TrapLightsOut` kills/freezes `GameManager.Player` | The victim is the player in the dark room/the nearest; call these methods under the victim's swap | `LightsOutMonster.cs` :150, :210; `TrapLightsOut.cs` :394–431 |
+| 15 | Vending machines: item and price are not seeded | `Automat.Initialize` picks the item with `WeightedElement.GetRandomElement` and the discount without a seed; on the client the sign and price may differ from what the host dispenses | Add `Automat`, `AutomatenManager`, `CompanionAutomat` to `RandomizerPatches.s_types` | `Automat.cs` :264, :286, :423; `AutomatenManager.cs` :100–177; `CompanionAutomat.cs` :136 |
 
-## Наблюдения, влияющие на много строк
+## Observations affecting many rows
 
-1. **Подмена не покрывает чужие `Update`.** Ловушки, менеджеры и AI-компаненты не на объекте P2 исполняются с `CurrentPlayer = P1` (подмена — только `Enemy`, злой `NPC`, `FlyingBehaviour`, `EnemyDetectionRange`). Строки 🔴 «цель = P1» в основном из-за этого.
-2. **Кэши игрока.** Игра сохраняет «игрока» в поле в `Awake`/`Start` и меняет его только через `GameManager.UpdatePlayer` (вызывается мод-кодом лишь при повышении P2). Поля: `DialogueTrigger.m_dialogueManager`, `FlyingBehaviour.m_player` (исправлено), `PipeSystem.m_player`, `EveliusController.m_player`, `LightsOutMonster.m_currentPlayer`, `DepthSwitch.m_playerCollider`, `HiveSpecialItem.m_character`, `HintObject.m_currentPlayer`, `CommandEvents.m_player`, `InteractionWindow.m_player`.
-3. **DialogueManager P2.** `Player.GameplayInit` → `DialogueManager.Initialize` читает `GameManager.Player`, а `CoopPlayers.SpawnP2` вызывает `GameplayInit` без подмены: `m_character`, аудио и аниматор менеджера P2 указывают на P1. Реплики P2 озвучиваются и анимируются на P1 (проверить по `[Window]`/`Talk` в логе).
-4. **Не глушится у клиента, но имеет Update/триггеры:** `Automat`, `CompanionAutomat`, `Pawnshop*`, `PipeSystem`, `DialogueTrigger`-семейство, `LightsOutMonster`, `SuctionPipe`, `HoleInWall`, `Oven`, `Clothesline`, `CeilingCorpseCrusher`, `AimingTrapBehaviour`, `PuzzleDeathTimer`, `Mole`, `RythmTrap`, `TrapFakeDoor`-семейство. Урон у клиента блокирован (`GetDamaged`), но анимации и спавны могут идти дважды.
-5. **Рандом без сида в Awake/Start/OnEnable:** `Automat`, `AutomatenManager`, `CompanionAutomat`, `ItemVault`, `HideOut`, `LabHubManager`, `IngredientSlot`, `SpawnTreasure`, `IndianaJonesRoomGenerator`, `Mole`, `MoleHoleTrap`, `PuzzleMonsterGamble`, `MonsterInWall`, `ConveyorBeltTrapProbability`, `TrapsInletProbaility`, `GooOnFloorActiveProbability`, `MonsterInGapActiveProbability`. Часть выравнивает «маска activeSelf + сверка числа объектов», но тип товара, цена и отдельные спрайты — нет.
-6. **Подтверждения из документов.** README: «Часть ловушек, подсказок и реплик компаньонов реагирует только на главного»; «Слои глубины общие»; «бутылка возрождения корректно только для главного». PLAN: бочка с порохом (видео), `leftover`-обломки, пещеры и редкий рассинхрон S03 открыты; фаза 1б и 6 не начаты.
-7. **Ограничения анализа.** Учтены только вхождения в тексте декомпиляции; обращения через промежуточные переменные (`var p = GameManager.Instance.Player;`) и через `Character`-поля не видны grep. Статус 🔴 выставлен по чтению кода, без запуска игры; для пунктов 1, 2 и 11 стоит подтвердить вживую (P1 далеко от NPC, P2 входит в триггер).
+1. **The swap does not cover other classes' `Update`.** Traps, managers and AI components that are not on P2's object run with `CurrentPlayer = P1` (the swap exists only for `Enemy`, evil `NPC`, `FlyingBehaviour`, `EnemyDetectionRange`). The 🔴 rows with "target = P1" are mostly due to this.
+2. **Player caches.** The game stores the "player" in a field in `Awake`/`Start` and changes it only via `GameManager.UpdatePlayer` (called by mod code only when P2 is promoted). Fields: `DialogueTrigger.m_dialogueManager`, `FlyingBehaviour.m_player` (fixed), `PipeSystem.m_player`, `EveliusController.m_player`, `LightsOutMonster.m_currentPlayer`, `DepthSwitch.m_playerCollider`, `HiveSpecialItem.m_character`, `HintObject.m_currentPlayer`, `CommandEvents.m_player`, `InteractionWindow.m_player`.
+3. **P2's DialogueManager.** `Player.GameplayInit` → `DialogueManager.Initialize` reads `GameManager.Player`, and `CoopPlayers.SpawnP2` calls `GameplayInit` without the swap: `m_character`, audio and animator of P2's manager point to P1. P2's lines are voiced and animated on P1 (check via `[Window]`/`Talk` in the log).
+4. **Not muted on the client, but has Update/triggers:** `Automat`, `CompanionAutomat`, `Pawnshop*`, `PipeSystem`, the `DialogueTrigger` family, `LightsOutMonster`, `SuctionPipe`, `HoleInWall`, `Oven`, `Clothesline`, `CeilingCorpseCrusher`, `AimingTrapBehaviour`, `PuzzleDeathTimer`, `Mole`, `RythmTrap`, the `TrapFakeDoor` family. Damage on the client is blocked (`GetDamaged`), but animations and spawns may run twice.
+5. **Unseeded random in Awake/Start/OnEnable:** `Automat`, `AutomatenManager`, `CompanionAutomat`, `ItemVault`, `HideOut`, `LabHubManager`, `IngredientSlot`, `SpawnTreasure`, `IndianaJonesRoomGenerator`, `Mole`, `MoleHoleTrap`, `PuzzleMonsterGamble`, `MonsterInWall`, `ConveyorBeltTrapProbability`, `TrapsInletProbaility`, `GooOnFloorActiveProbability`, `MonsterInGapActiveProbability`. Part of it is evened out by "activeSelf mask + object count check", but the item type, price and individual sprites are not.
+6. **Confirmations from the docs.** README: "Some traps, hints and companion lines react only to the main player"; "Depth layers are shared"; "the respawn bottle is correct only for the main player". PLAN: the powder keg (video), `leftover` debris, caves and the rare S03 desync are open; phases 1b and 6 are not started.
+7. **Limits of the analysis.** Only occurrences in the decompiled text were counted; accesses through intermediate variables (`var p = GameManager.Instance.Player;`) and through `Character` fields are invisible to grep. The 🔴 status is set by reading the code, without running the game; items 1, 2 and 11 should be confirmed live (P1 far from the NPC, P2 enters the trigger).

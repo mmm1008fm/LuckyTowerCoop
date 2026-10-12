@@ -1,29 +1,29 @@
-﻿# Онлайн на одном ПК: две копии игры через localhost.
-# Слева ХОСТ (клавиатура), справа КЛИЕНТ (геймпад, если подключён; иначе каждая копия слушает ввод только в фокусе).
-# После закрытия обеих копий настройки экрана игры (полный экран/разрешение) возвращаются как были.
+﻿# Online on one PC: two game copies over localhost.
+# HOST on the left (keyboard), CLIENT on the right (gamepad if connected; otherwise each copy only listens for input while focused).
+# After both copies are closed, the game's display settings (fullscreen/resolution) are restored.
 param(
     [string]$GameDir = 'D:\game\Lucky.Tower.Ultimate.v1.1.4',
     [ValidateSet('auto', 'keyboard', 'gamepad', 'all')][string]$HostDevice = 'auto',
     [ValidateSet('auto', 'keyboard', 'gamepad', 'all')][string]$ClientDevice = 'auto',
-    [switch]$DevServer,   # отладочные порты 47800/47801 (для автотестов)
-    [switch]$Steam,       # через Steam: хост — основной Steam, клиент — второй аккаунт Steam в песочнице Sandboxie (ящик $Box)
+    [switch]$DevServer,   # debug ports 47800/47801 (for autotests)
+    [switch]$Steam,       # via Steam: host is the main Steam, client is a second Steam account in a Sandboxie sandbox (box $Box)
     [string]$Box = 'Steam2',
-    [switch]$Force        # закрыть уже запущенную игру без вопроса
+    [switch]$Force        # close an already running game without asking
 )
 $ErrorActionPreference = 'Stop'
 $exe = Join-Path $GameDir 'Lucky Tower Ultimate.exe'
-if (-not (Test-Path $exe)) { throw "не найдена игра: $exe" }
+if (-not (Test-Path $exe)) { throw "game not found: $exe" }
 
 $running = Get-Process 'Lucky Tower Ultimate' -ErrorAction SilentlyContinue
 if ($running) {
     if (-not $Force) {
-        $a = Read-Host "Игра уже запущена ($($running.Count) шт.). Закрыть и запустить две копии? [y/N]"
-        if ($a -notmatch '^(y|д)') { return }
+        $a = Read-Host "The game is already running ($($running.Count) instance(s)). Close it and launch two copies? [y/N]"
+        if ($a -notmatch '^y') { return }
     }
     $running | Stop-Process -Force; Start-Sleep -Milliseconds 800
 }
 
-# Unity запоминает режим окна в реестре при выходе — сохраняем, чтобы вернуть полный экран после теста
+# Unity stores the window mode in the registry on exit - back it up so fullscreen can be restored after the test
 $key = 'HKCU:\Software\Studio Seufz\Lucky Tower Ultimate'
 $backup = @()
 if (Test-Path $key) {
@@ -37,11 +37,11 @@ $backup | ConvertTo-Json -Depth 3 | Set-Content $backupFile -Encoding utf8
 
 $extra = if ($DevServer) { ' --coop-devserver' } else { '' }
 
-# ---------- Steam: два аккаунта на одном ПК ----------
+# ---------- Steam: two accounts on one PC ----------
 $sbStart = 'C:\Program Files\Sandboxie-Plus\Start.exe'
 $steamExe = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamExe
 function Get-BoxSteamUser {
-    # пока в ящике что-то запущено, его реестр смонтирован в HKU\Sandbox_<пользователь>_<ящик>
+    # while anything runs in the box, its registry is mounted at HKU\Sandbox_<user>_<box>
     $hive = Get-ChildItem 'Registry::HKEY_USERS' -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -like "Sandbox_*_$Box" } | Select-Object -First 1
     if (-not $hive) { return 0 }
     $p = "Registry::$($hive.Name)\user\current\software\Valve\Steam\ActiveProcess"
@@ -49,36 +49,36 @@ function Get-BoxSteamUser {
     if ($v) { return [int64]$v } else { return 0 }
 }
 if ($Steam) {
-    if (-not (Test-Path $sbStart)) { throw "нужен Sandboxie-Plus (не найден $sbStart)" }
-    if (-not $steamExe) { throw 'не найден Steam' }
+    if (-not (Test-Path $sbStart)) { throw "Sandboxie-Plus is required (not found: $sbStart)" }
+    if (-not $steamExe) { throw 'Steam not found' }
     $sbIni = 'C:\Program Files\Sandboxie-Plus\SbieIni.exe'
     if (-not ((& $sbIni query $Box Enabled) -match 'y')) {
         & $sbIni set $Box Enabled y | Out-Null
         & $sbStart /reload | Out-Null
-        "создан ящик Sandboxie «$Box»"
+        "created Sandboxie box '$Box'"
     }
-    # основной Steam (аккаунт хоста)
+    # main Steam (host account)
     if (-not ((Get-ItemProperty 'HKCU:\Software\Valve\Steam\ActiveProcess' -ErrorAction SilentlyContinue).ActiveUser)) {
-        "запускаю основной Steam…"
+        "starting the main Steam..."
         Start-Process $steamExe -ArgumentList '-silent'
         for ($i = 0; $i -lt 90 -and -not (Get-ItemProperty 'HKCU:\Software\Valve\Steam\ActiveProcess' -ErrorAction SilentlyContinue).ActiveUser; $i++) { Start-Sleep 1 }
-        if (-not (Get-ItemProperty 'HKCU:\Software\Valve\Steam\ActiveProcess' -ErrorAction SilentlyContinue).ActiveUser) { throw 'основной Steam не вошёл в аккаунт за 90 с — войдите и запустите снова' }
+        if (-not (Get-ItemProperty 'HKCU:\Software\Valve\Steam\ActiveProcess' -ErrorAction SilentlyContinue).ActiveUser) { throw 'the main Steam did not log in within 90 s - log in and run again' }
     }
-    # второй Steam в ящике (аккаунт клиента)
+    # second Steam in the box (client account)
     if ((Get-BoxSteamUser) -eq 0) {
-        "запускаю второй Steam в песочнице «$Box»…"
+        "starting the second Steam in sandbox '$Box'..."
         & $sbStart "/box:$Box" $steamExe | Out-Null
         for ($i = 0; $i -lt 60 -and (Get-BoxSteamUser) -eq 0; $i++) { Start-Sleep 1 }
         if ((Get-BoxSteamUser) -eq 0) {
-            "второй Steam ещё не вошёл в аккаунт: войдите в окне Steam с жёлтой рамкой вторым аккаунтом (он должен быть в друзьях у основного),"
-            "отметьте «Запомнить меня» и запустите этот скрипт снова."
+            "the second Steam is not logged in yet: in the Steam window with the yellow border, log in with the second account (it must be a friend of the main one),"
+            "tick 'Remember me' and run this script again."
             return
         }
     }
-    "оба Steam в сети"
+    "both Steam instances are online"
 }
-# Пока мод не загрузился, игра без фокуса стоит на паузе — поэтому копии запускаются по очереди:
-# клиент стартует, когда хост уже загрузился (мод переименовывает окно в «… ХОСТ …»).
+# Until the mod has loaded, an unfocused game stays paused - so the copies are launched one after another:
+# the client starts once the host has loaded (the mod renames the window to '... HOST ...').
 Add-Type @"
 using System; using System.Text; using System.Runtime.InteropServices;
 public static class LtWin {
@@ -96,28 +96,28 @@ public static class LtWin {
 function Wait-Title($proc, $text, $sec) {
     for ($i = 0; $i -lt $sec; $i++) {
         Start-Sleep -Seconds 1
-        if ($proc.HasExited) { throw "копия игры закрылась при запуске (pid $($proc.Id))" }
+        if ($proc.HasExited) { throw "the game copy exited during startup (pid $($proc.Id))" }
         if ([LtWin]::Titles($proc.Id) -match $text) { return $true }
     }
     return $false
 }
 $hostArgs = if ($Steam) { '--coop-steam-host' } else { '--coop-host' }
 $h = Start-Process $exe -WorkingDirectory $GameDir -PassThru -ArgumentList "$hostArgs --coop-window left --coop-device $HostDevice$extra"
-"запускаю хост (pid $($h.Id))…"
-if (-not (Wait-Title $h 'ХОСТ' 90)) { "хост грузится дольше обычного — запускаю клиента всё равно" }
+"starting host (pid $($h.Id))..."
+if (-not (Wait-Title $h 'HOST' 90)) { "host is taking longer than usual to load - starting the client anyway" }
 if ($Steam) {
-    # клиент — в песочнице: его Steam (второй аккаунт), сохранения и настройки экрана остаются в ящике
+    # client runs in the sandbox: its Steam (second account), saves and display settings stay in the box
     & $sbStart "/box:$Box" $exe --coop-steam-join --coop-window right --coop-device $ClientDevice $extra.Trim() | Out-Null
     $c = $null
     for ($i = 0; $i -lt 30 -and -not $c; $i++) { Start-Sleep 1; $c = Get-Process 'Lucky Tower Ultimate' -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne $h.Id } | Select-Object -First 1 }
-    if (-not $c) { throw 'копия игры в песочнице не запустилась' }
+    if (-not $c) { throw 'the game copy in the sandbox did not start' }
 } else {
     $c = Start-Process $exe -WorkingDirectory $GameDir -PassThru -ArgumentList "--coop-join 127.0.0.1 --coop-window right --coop-device $ClientDevice$extra"
 }
-"запускаю клиента (pid $($c.Id)) — не переключайтесь из его окна, пока оно не встанет справа…"
-if (Wait-Title $c 'КЛИЕНТ' 90) { "обе копии готовы: слева хост, справа клиент" } else { "клиент не загрузился за 90 с — щёлкните по его окну" }
+"starting client (pid $($c.Id)) - do not switch away from its window until it snaps to the right..."
+if (Wait-Title $c 'CLIENT' 90) { "both copies are ready: host on the left, client on the right" } else { "client did not load within 90 s - click its window" }
 
-# Фоновый сторож: ждёт закрытия обеих копий и возвращает настройки экрана
+# Background watcher: waits for both copies to close and restores the display settings
 $restore = @"
 `$ids = @($($h.Id), $($c.Id))
 while (Get-Process -Id `$ids -ErrorAction SilentlyContinue) { Start-Sleep -Seconds 2 }
@@ -131,4 +131,4 @@ Remove-Item '$backupFile' -Force
 "@
 $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($restore))
 Start-Process powershell -WindowStyle Hidden -ArgumentList "-NoProfile -ExecutionPolicy Bypass -EncodedCommand $enc" | Out-Null
-"после закрытия обеих копий настройки экрана вернутся сами"
+"display settings will be restored automatically after both copies are closed"

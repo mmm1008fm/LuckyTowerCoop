@@ -1,80 +1,80 @@
-# Отчёт по очереди A–E (ветка work/queue)
+# Report on queue A–E (branch work/queue)
 
-Проверка везде: две копии через `tools\local-online.ps1 -DevServer`, сид `seed 4242` (новая dev-команда) либо случайный;
-регрессия после каждой задачи — `pwsh tools\route-test.ps1 -Rooms 10`: у всех комнат `entities host=N client=N` равны,
-`resync: host 0, client 0`, ошибок мода нет (только `Loading standard input`; один раз игровая `Torture Chamber ... has no linked item spawner` на обеих копиях).
+Verification everywhere: two copies via `tools\local-online.ps1 -DevServer`, seed `seed 4242` (a new dev command) or random;
+regression after each task — `pwsh tools\route-test.ps1 -Rooms 10`: for all rooms `entities host=N client=N` are equal,
+`resync: host 0, client 0`, no mod errors (only `Loading standard input`; once the game's own `Torture Chamber ... has no linked item spawner` on both copies).
 
-## A. Покупки вторым игроком платятся его монетами — `11ee8bd`
-Что сделано:
-- `Weapon.ApplyDamage` выполняется от имени владельца-второго игрока (раньше под подменой был только `GetPotentialHitTargets`,
-  а удар по рычагу применялся уже вне подмены) → автоматы `Automat`, `CompanionAutomat`, `PipeSystem` списывают у ударившего.
-- Подсказка координатора подтвердилась и расширена: `DialogueTrigger` кэширует менеджер диалогов P1. Теперь для всех методов
-  30 подклассов `DialogueTrigger` (221 метод) поле `m_dialogueManager` подменяется на менеджер действующего игрока (поле, а не геттер —
-  геттер может быть встроен JIT-ом); методы-«действия» магазинов (оплата, стрижка, события аниматора) выполняются от имени игрока,
-  чей менеджер ведёт диалог (`Patches/PurchasePatches.cs`).
-- Найдена ошибка пересылки окон: `InteractionWindow` при открытии уходит под точку «иконки» NPC, и `OwnerContext.SecondOwnerOf`
-  не узнавал его как окно второго (лог `open ... on host window`, клиент окно не видел, Update окна шёл вне подмены).
-  Теперь окно сверяется с `P2.Components.InteractionWindow`.
-- `DropAllCoinsDialogue` (банк/банкомат) работает с игроком, который стоит в его зоне (`IsTouching`).
-- Dev: `gold p1|p2 [N]`, `shops`, `seed N`, `village bank on`, `find`; `tools\testlib.ps1` (`Start-Pair`, `Enter-Room`); хелпер `Coop/CoopGold.cs`.
-Проверено (числа):
-- Автомат компаньона (цена 4), удар по рычагу персонажем клиента (место B): у него 12 → 8, у хоста 12 → 12. До правки платил хост (12 → 8, у клиента 12).
-- Автомат в хабе (цена 6), удар хоста: 15 → 9, у клиента 15 → 15.
-- Банкомат в деревне (`village bank on`), P1 стоит далеко (−166), клиентский персонаж входит в зону: окно `DropCoins on partner window`,
-  клиент видит его, выбор → у клиента 9 → 0, у хоста 6 → 6, `coinsBank` +9. Затем наоборот (хост): 6 → 0, у клиента 7 → 7.
-- Трубочист: у клиента открывается окно `TalkPrompt` (партнёрское, зеркалится клиенту).
-Не проверено вживую: полный цикл оплаты у `Pawnshop`, `PawnshopMain`, `Barber`, `Pipefitter` (длинные диалоги/голова-комната `VonWanstHeadManager`,
-меняют сохранение деревни). Подмена на их методах оплаты стоит (`ShopActionContextPatches` → `DialogueTriggerContextPatches`), но живой оплаты второго там не делал.
-Не затронуто: `EvTasks` (Эвелиус забирает золото: `GameManager.Player` под подменой ИИ), `CharacterUtilities.cs:4851/4955`.
+## A. Purchases by the second player are paid with their coins — `11ee8bd`
+What was done:
+- `Weapon.ApplyDamage` runs on behalf of the owner when that is the second player (previously only `GetPotentialHitTargets` was under the swap,
+  and the hit on the lever was applied outside the swap) → the `Automat`, `CompanionAutomat`, `PipeSystem` vending machines deduct from whoever hit them.
+- The coordinator's hint was confirmed and extended: `DialogueTrigger` caches P1's dialogue manager. Now, for all methods of the
+  30 `DialogueTrigger` subclasses (221 methods), the `m_dialogueManager` field is replaced with the acting player's manager (the field, not the getter —
+  the getter may be inlined by the JIT); the shops' "action" methods (payment, haircut, animator events) run on behalf of the player
+  whose manager is running the dialogue (`Patches/PurchasePatches.cs`).
+- Found a window forwarding bug: when opened, `InteractionWindow` goes under the NPC's "icon" point, and `OwnerContext.SecondOwnerOf`
+  did not recognize it as the second player's window (log `open ... on host window`, the client did not see the window, the window's Update ran outside the swap).
+  Now the window is matched against `P2.Components.InteractionWindow`.
+- `DropAllCoinsDialogue` (bank/ATM) works with the player standing in its zone (`IsTouching`).
+- Dev: `gold p1|p2 [N]`, `shops`, `seed N`, `village bank on`, `find`; `tools\testlib.ps1` (`Start-Pair`, `Enter-Room`); helper `Coop/CoopGold.cs`.
+Verified (numbers):
+- Companion vending machine (price 4), a hit on the lever by the client's character (seat B): it goes 12 → 8, the host stays 12 → 12. Before the fix the host paid (12 → 8, the client at 12).
+- Vending machine in a hub (price 6), hit by the host: 15 → 9, the client 15 → 15.
+- ATM in the village (`village bank on`), P1 stands far away (−166), the client's character enters the zone: window `DropCoins on partner window`,
+  the client sees it, choice → the client goes 9 → 0, the host 6 → 6, `coinsBank` +9. Then the other way round (host): 6 → 0, the client 7 → 7.
+- Pipefitter: on the client a `TalkPrompt` window opens (the partner's, mirrored to the client).
+Not verified live: the full payment cycle at `Pawnshop`, `PawnshopMain`, `Barber`, `Pipefitter` (long dialogues / the head room `VonWanstHeadManager`,
+they change the village save). The swap on their payment methods is in place (`ShopActionContextPatches` → `DialogueTriggerContextPatches`), but I did not run a live payment by the second player there.
+Not touched: `EvTasks` (Evelius takes gold: `GameManager.Player` under the AI swap), `CharacterUtilities.cs:4851/4955`.
 
-## B. Передача монет напарнику — `05907a7`
-- Вкладка «Игроки» (F7): блок «Монеты» — «Передать 1 / 10 / все» для своего персонажа (локально — для каждого).
-- `Msg.GiveCoins = 29` (клиент → хост, количество); меняет только хост (`CoopGold.Transfer`: списание `Utilities.RemoveCoins`, зачисление
-  на пояс, пустой кошель создаётся как в `GameManager`/`EquipGoldSack`; ограничено свободным местом получателя — 20 на кошель).
-- `PlayerState` теперь несёт общее число монет места, клиентское меню показывает реальные числа (раньше у марионеток-клиента кошелей нет).
-- Dev: `givecoins p1|p2 N` (то же, что кнопка; у клиента — запрос хосту).
-Проверено: старт хост P1=5, клиентский=8 (клиент видит 8/5). Хост даёт 3: хост 2/11, клиент 11/2. Клиент даёт 4: хост 6/7, клиент 7/6.
-Клиент даёт «все»: хост 13/0, клиент 0/13. Лимит: у хоста 18, клиент даёт 10 → хост 20, клиент 8. Скриншот вкладки у клиента: «Вы: 8 … Передать 1/10/все».
-Не нажимал кнопки мышью (GUI) — вызывал тот же `CoopGold.GiveToPartner` через dev-команду.
+## B. Giving coins to the partner — `05907a7`
+- Players tab (F7): a "Coins" block — "Give 1 / 10 / all" for your own character (locally — for each).
+- `Msg.GiveCoins = 29` (client → host, the amount); only the host changes things (`CoopGold.Transfer`: deduction via `Utilities.RemoveCoins`, crediting
+  to the belt, an empty purse is created as in `GameManager`/`EquipGoldSack`; limited by the recipient's free space — 20 per purse).
+- `PlayerState` now carries the seat's total coin count, and the client menu shows real numbers (previously the client's puppets have no purses).
+- Dev: `givecoins p1|p2 N` (the same as the button; on the client it is a request to the host).
+Verified: start host P1=5, client's=8 (the client sees 8/5). The host gives 3: host 2/11, client 11/2. The client gives 4: host 6/7, client 7/6.
+The client gives "all": host 13/0, client 0/13. Limit: the host has 18, the client gives 10 → host 20, client 8. Screenshot of the tab on the client: "You: 8 … Give 1/10/all".
+I did not click the buttons with the mouse (GUI) — I called the same `CoopGold.GiveToPartner` via the dev command.
 
-## C. Обломки «leftover» — `82394f8`
-- `NetHost.Register` не регистрирует (кроме персонажей) объекты `leftover*`, `*LeftOvers`, под родителями `PlantRemains`/`*LeftOvers`, `*ArmorDestroyed*`
-  (`PeasantArmorDestroyed_NN`). Оказалось, что обломки — `PickupItem`, они попадали в сканирование предметов, а не в `WorldObjects`.
-Проверено: до правки на маршруте (сид случайный) клиент писал `3 of 4 host objects not found here: leftover (1); leftover (2); leftover (3)` (дважды);
-после: комната `S01_F01_R01`, разбил сундук (5 активных `leftover`, `rb=True`): в `netents` хоста и клиента 0 объектов `leftover`, по 29/29 сущностей,
-в логе клиента 0 строк `not found ... leftover`. `PeasantArmorDestroyed_02..06` (5 объектов «не найдены» в `S03_F06_R03`) добавлены позже, отдельным прогоном не перепроверены
-(в последующих прогонах строки уже не встречались; один раз осталась разница 58/57 в `S03_F06_R01`).
+## C. "leftover" debris — `82394f8`
+- `NetHost.Register` does not register (except characters) objects `leftover*`, `*LeftOvers`, under the parents `PlantRemains`/`*LeftOvers`, `*ArmorDestroyed*`
+  (`PeasantArmorDestroyed_NN`). It turned out the debris are `PickupItem`s, which went into the item scan rather than into `WorldObjects`.
+Verified: before the fix, on the route (random seed) the client wrote `3 of 4 host objects not found here: leftover (1); leftover (2); leftover (3)` (twice);
+after: room `S01_F01_R01`, broke a chest (5 active `leftover`, `rb=True`): `netents` on the host and the client has 0 `leftover` objects, 29/29 entities each,
+0 `not found ... leftover` lines in the client log. `PeasantArmorDestroyed_02..06` (5 objects "not found" in `S03_F06_R03`) were added later, not rechecked in a separate run
+(the lines no longer appeared in subsequent runs; once a 58/57 difference remained in `S03_F06_R01`).
 
-## D. Видео взрыва башни у клиента — `24af8ba`
-- `Msg.TowerExplosion = 31`; `Patches/PowderKegPatches.cs`: префикс на `TrapPowderKeg.DestroyTower` и `SpecialItemPowderKeg.DestroyTower` —
-  хост шлёт сообщение, у клиента локальный вызов блокируется. Клиент: корутина (ввод и движение обоих персонажей выключены, звук башни глохнет как у хоста,
-  `VideoLibrary.ExplodingTower` на `CameraManager.MainVideoPlayer`, `CameraNearPlane`, `PlayingVideo=true` на время ролика, затем false).
-  Добавлена ссылка на `UnityEngine.VideoModule` в csproj. Dev: `kegboom`, `itemnames`, `spawnitem Имя_с_пробелами`.
-Проверено: `kegboom` на хосте (в сцене бочек не было — пустышка `TrapPowderKeg`, это вызов настоящего `DestroyTower`):
-хост `[NetHost] tower explosion sent`, клиент `[NetClient] tower explosion` → `video playing` → `video finished`; скриншот клиента — кадр ролика (разрушенная башня, дым).
-Ограничения: реальной бочки в комнате не поджигал (в сегментах 1 с сидом 4242 их нет; они в поздних); смерть по-прежнему делает оригинальный код только с `GameManager.Player`
-(второго игрока он не убивает — вне задачи, оставлено как есть).
+## D. Tower explosion video on the client — `24af8ba`
+- `Msg.TowerExplosion = 31`; `Patches/PowderKegPatches.cs`: a prefix on `TrapPowderKeg.DestroyTower` and `SpecialItemPowderKeg.DestroyTower` —
+  the host sends the message, and on the client the local call is blocked. Client: a coroutine (input and movement of both characters off, the tower sound fades as on the host,
+  `VideoLibrary.ExplodingTower` on `CameraManager.MainVideoPlayer`, `CameraNearPlane`, `PlayingVideo=true` for the duration of the clip, then false).
+  Added a reference to `UnityEngine.VideoModule` in the csproj. Dev: `kegboom`, `itemnames`, `spawnitem Name_with_spaces`.
+Verified: `kegboom` on the host (there were no kegs in the scene — an empty `TrapPowderKeg`, a call to the real `DestroyTower`):
+host `[NetHost] tower explosion sent`, client `[NetClient] tower explosion` → `video playing` → `video finished`; client screenshot — a frame of the clip (destroyed tower, smoke).
+Limitations: I did not ignite a real keg in a room (there are none in segment 1 with seed 4242; they are in later ones); the death is still done by the original code only for `GameManager.Player`
+(it does not kill the second player — out of scope, left as is).
 
-## E. Пещеры и рассинхрон сегмента 3 — `8cff463`
-Задача 5 (S03): причина найдена и исправлена. Генерация сегмента читает `GameManager.Player.Stats.SegmentID` (имена комнат `S0N_…`, тип пола,
-индекс списка `NonExitRooms`). Игра выставляет его только при проходе через дверь; клиент входит в комнаты по сообщению хоста, поэтому его значение
-отставало (1 против 2) и сегмент 3 получал комнаты `S02_F05_R01…` вместо `S03_…`. Отпечатки `[Gen]` в воспроизведённом прогоне:
-`segId=2` (хост) против `segId=1` (клиент), списки комнат различаются только префиксом. Исправление: `NetClient.SyncPlayerSegment` перед входом в комнату (и `seg-1` при догенерации).
-Проверено: 5 прогонов `route-test -Rooms 40 -Until S03_ -AvoidBalcony` (флаг добавлен): `resync 0/0`, число объектов равно в каждой комнате, все `[Gen]` DungeonOne…Four
-совпадают (`gencmp`: «same»; в одном прогоне различались только имя игрока/зубы, на комнаты не влияет). Комната `S03_F04_R02` достигается и находится у клиента.
-Без флага `-AvoidBalcony` маршрут уходит через Лимбо (см. ниже) — это отдельное явление.
+## E. Caves and the segment 3 desync — `8cff463`
+Task 5 (S03): the cause was found and fixed. Segment generation reads `GameManager.Player.Stats.SegmentID` (room names `S0N_…`, floor type,
+the index into the `NonExitRooms` list). The game sets it only when passing through a door; the client enters rooms by the host's message, so its value
+lagged behind (1 vs 2) and segment 3 got rooms `S02_F05_R01…` instead of `S03_…`. `[Gen]` fingerprints in the reproduced run:
+`segId=2` (host) versus `segId=1` (client), the room lists differ only in the prefix. The fix: `NetClient.SyncPlayerSegment` before entering a room (and `seg-1` when generating the remainder).
+Verified: 5 runs of `route-test -Rooms 40 -Until S03_ -AvoidBalcony` (flag added): `resync 0/0`, object counts equal in every room, all `[Gen]` DungeonOne…Four
+match (`gencmp`: "same"; in one run only the player name/teeth differed, which does not affect the rooms). Room `S03_F04_R02` is reached and found on the client.
+Without the `-AvoidBalcony` flag the route goes through Limbo (see below) — that is a separate phenomenon.
 
-Задача 6 (пещеры): сидированный `GenerateCave` сам по себе детерминирован: dev-команды `gencaves` + `cavehash` (создают сегменты 2…пещеру на обеих копиях и считают отпечаток
-комнат и элементов уровня) → одинаковый хэш (`26192FAA` на обоих; в прогонах через комнаты `736169D5`/`E428DCBF` — равны на хосте и клиенте).
-Но в реальном маршруте комната «Cave» у клиента была другой: имена пещерных комнат повторяются в кластерах («Cave 6» ×3, `seg=7/8/9`), `FindRoom` брал первую по имени
-(хост 32 объекта, клиент 15). Теперь `FindRoom(name, segmentId)`. После правки в прогоне `-Until Cave -AvoidBalcony`: Entrance и Cave без расхождений, `resync 0/0`.
-Не получилось / открыто:
-- Пещеры без `-AvoidBalcony` и вообще путь через Балкон → «Sphere BubbleDoor» (Лимбо): хост пересоздаёт `SegmentManager` с новым сидом (башня-вселенная),
-  клиент об этом не знает → `EnsureSegments` крутится заново на каждой комнате (сотни `generating segment 1..3`), у клиента 0–50 сущностей против 90 у хоста, `resync` растёт.
-  Нужна отдельная фича (передача нового сида + повтор `StartTowerverseTransition` у клиента) — не делал.
-- `route-test` без `-AvoidBalcony` упирается и в запертые «ChestKey/LockedChest» комнаты (`no forward exit`) — эвристика маршрута, не мод.
+Task 6 (caves): the seeded `GenerateCave` is itself deterministic: dev commands `gencaves` + `cavehash` (create segments 2…cave on both copies and compute a fingerprint
+of the rooms and level elements) → the same hash (`26192FAA` on both; in runs through rooms `736169D5`/`E428DCBF` — equal on the host and the client).
+But on the real route the "Cave" room on the client was a different one: cave room names repeat in clusters ("Cave 6" ×3, `seg=7/8/9`), and `FindRoom` took the first by name
+(host 32 objects, client 15). Now `FindRoom(name, segmentId)`. After the fix, in the run `-Until Cave -AvoidBalcony`: Entrance and Cave without divergences, `resync 0/0`.
+Did not work / open:
+- Caves without `-AvoidBalcony`, and in general the path through the Balcony → "Sphere BubbleDoor" (Limbo): the host recreates `SegmentManager` with a new seed (the tower-verse),
+  the client does not know about it → `EnsureSegments` spins anew on every room (hundreds of `generating segment 1..3`), the client has 0–50 entities against the host's 90, and `resync` grows.
+  This needs a separate feature (passing the new seed + repeating `StartTowerverseTransition` on the client) — I did not do it.
+- `route-test` without `-AvoidBalcony` also runs into locked "ChestKey/LockedChest" rooms (`no forward exit`) — a route heuristic, not the mod.
 
-## Прочее
-- Тестовый профиль сохранения `PROFILE_TWO` в `StreamingAssets\SaveFiles` менялся тестами (деревня, банк); перед тестами сделана копия, изменённые файлы восстановлены
-  (профиль `PROFILE_ONE` не менялся). Новые автосейвы с метками `261012_*` остались.
-- Не трогал: `docs/COVERAGE.md`, версию мода, Google Диск, `main`.
+## Miscellaneous
+- The test save profile `PROFILE_TWO` in `StreamingAssets\SaveFiles` was modified by the tests (village, bank); a copy was made before the tests, the modified files were restored
+  (profile `PROFILE_ONE` was not changed). New autosaves labeled `261012_*` remain.
+- Not touched: `docs/COVERAGE.md`, the mod version, Google Drive, `main`.

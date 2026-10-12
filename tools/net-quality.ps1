@@ -1,7 +1,7 @@
-﻿# Стенд качества сети: две копии через localhost, на обеих включается имитация канала (NetLinkSim),
-# оба персонажа ходят туда-обратно, клиент меряет задержку ввода и плавность показа напарника.
-# Каждый профиль канала прогоняется в двух режимах показа: legacy (догоняние снапшота) и buffer (буфер интерполяции).
-#   pwsh tools\net-quality.ps1                       # все профили
+﻿# Network quality bench: two copies over localhost, both with link simulation enabled (NetLinkSim),
+# both characters walk back and forth, the client measures input lag and how smoothly the partner is displayed.
+# Each link profile is run in two display modes: legacy (snapshot catch-up) and buffer (interpolation buffer).
+#   pwsh tools\net-quality.ps1                       # all profiles
 #   pwsh tools\net-quality.ps1 -Profiles wifi,bad -Seconds 20 -NoLaunch
 param(
     [string[]]$Profiles = @('lan', 'good', 'wifi', 'bad', 'awful'),
@@ -23,7 +23,7 @@ if (-not $NoLaunch) {
 }
 DevA god | Out-Null
 $m = [regex]::Match((DevA where), 'P1 .*?pos=\(([-\d.]+), ([-\d.]+)')
-if (-not $m.Success) { throw 'нет позиции игрока хоста' }
+if (-not $m.Success) { throw 'host player position not found' }
 $x0 = [double]::Parse($m.Groups[1].Value, $inv)
 $a = ($x0 - 3).ToString('F2', $inv); $b = ($x0 + 3).ToString('F2', $inv)
 
@@ -33,7 +33,7 @@ foreach ($p in $Profiles) {
     foreach ($mode in $Modes) {
         DevB "net interp $mode" | Out-Null
         DevA "patrol p1 $a $b $($Seconds + 4)" | Out-Null; DevB "patrol p1 $a $b $($Seconds + 4)" | Out-Null
-        Start-Sleep 3   # канал и оценка джиттера устаканиваются
+        Start-Sleep 3   # link and jitter estimate settle
         DevB 'net quality reset' | Out-Null
         Start-Sleep $Seconds
         $q = DevB 'net quality'
@@ -51,6 +51,6 @@ foreach ($p in $Profiles) {
 DevA 'net link off' | Out-Null; DevB 'net link off' | Out-Null; DevB 'net interp buffer' | Out-Null
 $out = Join-Path $t '..\docs\net-quality-last.csv'
 $rows | Export-Csv $out -NoTypeInformation -Encoding utf8
-"таблица: $out"
-"lag — от нажатия у клиента до ответа хоста, мс; hitch — доля кадров с рывком напарника; extrap — кадры, где буферу не хватило данных;"
-"gaps — провалы потока снапшотов > 50 мс; delay — задержка показа буфера, мс; jitter — оценка разброса задержки, мс; snaps — резкие поправки своего персонажа"
+"table: $out"
+"lag - from the client's key press to the host's response, ms; hitch - share of frames with a partner jerk; extrap - frames where the buffer ran out of data;"
+"gaps - snapshot stream gaps > 50 ms; delay - buffer display delay, ms; jitter - latency spread estimate, ms; snaps - sharp corrections of the own character"

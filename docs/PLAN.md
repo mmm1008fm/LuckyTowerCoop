@@ -1,153 +1,153 @@
-# План доработки онлайна (после первого живого прогона 0.3.1/0.3.2)
+# Online rework plan (after the first live run of 0.3.1/0.3.2)
 
-## Что сломано по отзыву
+## What was reported broken
 
-Магазины (второй не может покупать); банан «навсегда»; рычаги не видны и не нажимаются; двери-ловушки не видны; злой маг не виден;
-барабанщики не замолкают; пол падает поздно; монстры из пропастей рассинхронены; заклятье прислужника; камера не следит за другом,
-чернота, свет; зеркало только для хоста; компаньоны; сундук не разбить; ловушки с отставанием; камера замирает после смерти;
-задержка управления («как секунда» при пинге 50); рестарт у клиента ломает всё; урон по врагам не виден; джинн/обезьяна.
+Shops (the second player cannot buy); the banana "forever"; levers not visible and not pressable; trap doors not visible; the evil mage not visible;
+drummers never stop; the floor collapses late; monsters from pits are out of sync; the minion's spell; the camera does not follow the friend,
+blackness, lighting; the mirror works for the host only; companions; the chest cannot be broken; traps lag behind; the camera freezes after death;
+input delay ("like a second" at ping 50); a client restart breaks everything; damage to enemies is not visible; the genie/monkey.
 
-## Три корневые причины
+## Three root causes
 
-1. **Клиент не симулирует своего персонажа.** Ввод → хост → снапшот → сглаживание. Цепочка при пинге 50:
-   50 (сеть) + 2×(5–10) (паузы `CoopNet` в обе стороны) + ~25 (снапшот 20 Гц) + 70–100 (экспоненциальное сглаживание, k = 1−e^(−15·dt))
-   + 2 кадра ≈ 200–250 мс. Свой сервер не поможет — задержка в конвейере, а не в транспорте.
-2. **Синхронизируются только `Character` и `PickupItem`.** Мир (28 подклассов `Trap`, `Lever`/`PuzzleLever`/`LightsOutLever`,
+1. **The client does not simulate its own character.** Input → host → snapshot → smoothing. The chain at ping 50:
+   50 (network) + 2×(5–10) (`CoopNet` sleeps in both directions) + ~25 (snapshot at 20 Hz) + 70–100 (exponential smoothing, k = 1−e^(−15·dt))
+   + 2 frames ≈ 200–250 ms. Our own server would not help: the delay is in the pipeline, not in the transport.
+2. **Only `Character` and `PickupItem` are synchronized.** The world (28 `Trap` subclasses, `Lever`/`PuzzleLever`/`LightsOutLever`,
    `TrapCrumblingGap`/`ParkourGapInFloorTrap`, `TreasureChest`, `TrapBigBand`, `TrapLightsOut`, `PotentialMonster`, `EveliusController`)
-   живёт на двух машинах независимо. Ловушки клиента реагируют на его отстающую марионетку.
-3. **Игра везде берёт «игрока» = `Player.CurrentPlayer` / `GameManager.Instance.Player`.** `TargetSwap` стоит только на Update/FixedUpdate/
-   GetDamaged/кошель. Мимо идут: корутины (банан — конец скольжения в корутине), `PawnshopMain` (11 обращений), `Djinn`, `MirrorPlatform`,
+   lives on the two machines independently. The client's traps react to its lagging puppet.
+3. **The game everywhere takes "the player" = `Player.CurrentPlayer` / `GameManager.Instance.Player`.** `TargetSwap` exists only on Update/FixedUpdate/
+   GetDamaged/purse. These slip through: coroutines (banana: the end of the slide is in a coroutine), `PawnshopMain` (11 references), `Djinn`, `MirrorPlatform`,
    `TrapLightsOut` (15), `Sleeper` (18), `TrapPowderKeg` (11).
 
-## Фазы
+## Phases
 
-### 0. Измерение (S)
-- Клиент нумерует пакеты ввода; хост в снапшоте возвращает номер последнего применённого; клиент считает три участка:
-  ввод→применён на хосте, снапшот→получен, получен→виден (после сглаживания). Показывать в HUD (F7 → Онлайн).
-- Проверить флаги отправки в `CoopNet` (снапшоты/ввод — Unreliable, NoNagle).
+### 0. Measurement (S)
+- The client numbers input packets; the host returns the number of the last applied one in the snapshot; the client computes three segments:
+  input→applied on host, snapshot→received, received→visible (after smoothing). Show them in the HUD (F7 → Online).
+- Check the send flags in `CoopNet` (snapshots/input: Unreliable, NoNagle).
 
-### 1а. Быстрые выигрыши по задержке (S)
-- `CoopNet`: `Thread.Sleep(10/5)` → 1 мс или ожидание события.
-- Ввод: отправлять сразу при изменении маски + 60 Гц heartbeat.
-- Снапшоты мест A/B — 60 Гц, остальных объектов — 20 Гц.
-- Сглаживание: k по времени последнего снапшота (dead reckoning по скорости), а не экспонента.
-- Цель: ~250 → ~120 мс.
+### 1a. Quick latency wins (S)
+- `CoopNet`: `Thread.Sleep(10/5)` → 1 ms or an event wait.
+- Input: send immediately when the mask changes + a 60 Hz heartbeat.
+- Snapshots of seats A/B at 60 Hz, other objects at 20 Hz.
+- Smoothing: k based on the time since the last snapshot (dead reckoning by velocity), not an exponential.
+- Goal: ~250 → ~120 ms.
 
-### 2. Синхронизация мира целиком (L) — ядро
-- Хост регистрирует все объекты комнаты с `Animator`, `Rigidbody2D`, `Trap`, `Lever`, `TreasureChest`, `IDamageable`
-  (расширить `Scan`; ID по пути, как сейчас).
-- Снапшот объекта: аниматор (есть), трансформ (есть), `enabled`/`activeSelf` (есть частично), здоровье/повреждение (новое).
-- На клиенте компоненты `Trap`/`Lever`/`…` выключаются (`Behaviour.enabled = false`) — только отображение; урон клиенту приходит от хоста.
-- Урон по врагам: хост шлёт health, клиент вызывает штатную смену текстуры (`ReplaceColor`/damage sprite).
-- Despawn любых зарегистрированных объектов (сундук).
-- Объекты вне иерархии комнаты (маг, монстры из пропастей, спутники): регистрация по границам комнаты + создание из префаба (есть в 0.3.2 — проверить).
-- Закрывает: ловушки, двери-ловушки, пол, барабаны, рычаги (вид), сундук, свет (LightsOut), фиолетовые, маг, урон-текстуры.
+### 2. Synchronizing the whole world (L) — the core
+- The host registers all room objects with `Animator`, `Rigidbody2D`, `Trap`, `Lever`, `TreasureChest`, `IDamageable`
+  (extend `Scan`; IDs by path, as now).
+- Object snapshot: animator (exists), transform (exists), `enabled`/`activeSelf` (partly exists), health/damage (new).
+- On the client the `Trap`/`Lever`/`…` components are disabled (`Behaviour.enabled = false`): display only; damage to the client comes from the host.
+- Damage to enemies: the host sends health, the client calls the standard texture swap (`ReplaceColor`/damage sprite).
+- Despawn of any registered objects (chest).
+- Objects outside the room hierarchy (mage, monsters from pits, companions): registration by room boundaries + creation from a prefab (exists in 0.3.2; to be verified).
+- Closes: traps, trap doors, floor, drums, levers (appearance), chest, lighting (LightsOut), the purple ones, mage, damage textures.
 
-### 3. «Кто сейчас игрок» системно (M, рискованно)
-- Резолвер вместо точечных `TargetSwap`: транспайлер для вызовов `Player.get_CurrentPlayer` / `GameManager.get_Player` в типах
-  `CharacterUtilities`, `CharacterAction`, `PickupItem`+наследники, `Trap`+наследники, `PawnshopMain/Sell`, `Djinn`, `MirrorPlatform`,
-  `InteractionWindow` → «персонаж, с которым работаем» (владелец компонента / вошедший в триггер / текущая подмена).
-- Корутины персонажа: обёртка `IEnumerator`, каждый `MoveNext` под подменой владельца (патч `MonoBehaviour.StartCoroutine` для `Character`).
-- Закрывает: банан, зеркало для второго, джинн/обезьяна для второго, логика магазина для второго, подсказки.
+### 3. "Who is the player right now", systematically (M, risky)
+- A resolver instead of spot `TargetSwap`s: a transpiler for calls to `Player.get_CurrentPlayer` / `GameManager.get_Player` in the types
+  `CharacterUtilities`, `CharacterAction`, `PickupItem`+descendants, `Trap`+descendants, `PawnshopMain/Sell`, `Djinn`, `MirrorPlatform`,
+  `InteractionWindow` → "the character we are working with" (the component's owner / whoever entered the trigger / the current swap).
+- Character coroutines: an `IEnumerator` wrapper, every `MoveNext` under the owner's swap (a `MonoBehaviour.StartCoroutine` patch for `Character`).
+- Closes: banana, the mirror for the second player, genie/monkey for the second player, shop logic for the second player, hints.
 
-### 1б. Клиент сам двигает своего персонажа (L)
-- Собственный персонаж клиента симулируется локально (Update/FixedUpdate/физика/анимация включены), поза уходит хосту 60 Гц;
-  у хоста персонаж клиента — марионетка по позе, но действия (удар, подбор, рычаг, дверь, покупка) — события от клиента, хост подтверждает.
-- Расхождения: хост может «откатить» клиента (телепорт при >2 м) — редкость, если фаза 2 сделана.
-- Делать только после фазы 2.
+### 1b. The client moves its own character itself (L)
+- The client's own character is simulated locally (Update/FixedUpdate/physics/animation enabled), the pose goes to the host at 60 Hz;
+  on the host the client's character is a puppet driven by the pose, but actions (attack, pickup, lever, door, purchase) are events from the client, which the host confirms.
+- Divergences: the host may "roll back" the client (teleport at >2 m); rare if phase 2 is done.
+- Do this only after phase 2.
 
-### 4. Интерфейс второго игрока (M)
-- Проброс `InteractionWindow` (единое окно диалогов/магазина/джинна/банка/компаньонов): Open(варианты, состояние) → Choice → Close.
-- Рестарт клиента → запрос хосту + голосование у хоста; локальный рестарт на клиенте заблокирован с сообщением.
-- Смерть на клиенте: «текущим игроком» для систем игры становится напарник (камера, туман `UberFog`, свет, `SnapCameraToCollider`).
-- Закрывает: покупки, диалоги с выбором, рестарт, камера/чернота после смерти.
+### 4. Second player's interface (M)
+- Forwarding `InteractionWindow` (the single window for dialogues/shop/genie/bank/companions): Open(options, state) → Choice → Close.
+- Client restart → request to the host + a vote on the host; a local restart on the client is blocked with a message.
+- Death on the client: the partner becomes the "current player" for the game's systems (camera, `UberFog` fog, lighting, `SnapCameraToCollider`).
+- Closes: purchases, dialogues with choices, restart, camera/blackness after death.
 
-### 5. Смена тела (M)
-- Обезьяна (джинн), прислужник, зелье-монстр заменяют объект игрока (`CharacterAction` ~6588/6639).
-- Сообщение `Transform(seat, form)`; `CoopPlayers` переобвязывает P1/P2; клиент заменяет марионетку тем же префабом.
+### 5. Body swap (M)
+- The monkey (genie), the minion and the monster potion replace the player object (`CharacterAction` ~6588/6639).
+- A `Transform(seat, form)` message; `CoopPlayers` rebinds P1/P2; the client replaces the puppet with the same prefab.
 
-### 6. Стабилизация (M)
-- `route-test.ps1`: люки, балкон, внешняя стена, бонусные комнаты; контрольные суммы на все зарегистрированные объекты.
-- Прогон на износ 10+ минут; Steam на двух аккаунтах; релиз 0.4.
+### 6. Stabilization (M)
+- `route-test.ps1`: hatches, balcony, outer wall, bonus rooms; checksums for all registered objects.
+- A 10+ minute endurance run; Steam on two accounts; release 0.4.
 
-## Порядок
-0 → 1а → 2 → 3 → 1б → 4 → 5 → 6.
+## Order
+0 → 1a → 2 → 3 → 1b → 4 → 5 → 6.
 
-## Состояние (2026-10-12)
-- Фаза 0 — сделано: HUD «ввод→экран» (клиент), `net sim N` для имитации пинга.
-- Фаза 1а — сделано: задержка = пинг + ~26 мс (замер: пинг 100 → 132 мс, пинг 240 → 265 мс).
-- Фаза 2 — сделано в основном: объекты мира (аниматор/физика/Trap/Lever/Damagable/сундук) регистрируются и идут в снапшотах;
-  у клиента логика ловушек/рычагов/повреждаемых заглушена (47 типов); здоровье врагов → текстура урона; звук мира (барабаны);
-  выравнивание декораций по хэшам путей (списком выключенных объектов); «свет погас» пересылается; объекты, созданные хостом
-  на ходу (монстры из пропастей, молотобоец), создаются у клиента из префаба.
-  Закрыто 12.10 (вечер): пути объектов — имена с «/» («Window 6/4») и «#» («Door #1») ломали разбор пути, разделители заменены
-  на служебные символы → балкон синхронизируется целиком (458/458 объектов), хабы без потерь; рандомайзеры-удалители сидированы.
-- Фаза 3 — сделано: подмена «текущего игрока» для корутин второго персонажа (и корутин, запущенных во время подмены — банан),
-  физических колбэков (171) с коллайдером второго, Update компонентов на его объекте (142); удар оружием по «только игрок».
-  Проверено: банан на втором игроке заканчивается.
-- Фаза 4 — частично: окно выбора (InteractionWindow) пересылается клиенту (открыть/закрыть, вид, привязка); рестарт у клиента →
-  просьба хосту с окном «Начать заново / Нет» (проверено). Не сделано: камера/туман на клиенте после смерти = напарник.
-- Фаза 4 (камера): сделано — у клиента после смерти «игроком» для игры становится напарник (камера, туман, свет), после воскрешения — свой.
-- Фаза 5 — сделано: превращение второго персонажа (зелье-монстр, джинн, Эвелиус) идёт под подменой, новое тело переобвязывается как второй игрок;
-  клиент получает форму тела в PlayerState и создаёт марионетку из того же префаба (проверено: монстр, клиент им ходит).
-- Рандомайзеры (банки, бомбы, монстры в окнах): перед решением каждого генераторы (UnityEngine.Random и ThreadAwareRandom)
-  перезапускаются сидом «комната+путь+сид забега», состояние после — восстанавливается (иначе ломалась генерация башни).
-- 12.10 (вечер), 0.3.4: балкон — птица, ловушки-двери, зона сброса, ловушка спутника только у хоста, ветер по общему сиду;
-  тени персонажей, пыль стомперов, эффекты fx_* не регистрируются (косметика, −80 объектов на комнату);
-  Эвелиус в хабах — у клиента его логика не выполняется (раньше самоуничтожался по положению марионетки), лишний Эвелиус
-  убирается, если хост его не зарегистрировал. Проверено автотестом: окна диалога у клиента открываются/закрываются,
-  «свет погас» в обе стороны, сегменты 1–3 генерируются одинаково (отпечатки `[Gen]` совпадают), бонус-комнаты, запертые
-  комнаты с рычагами. Один раз комната сегмента 3 у клиента не нашлась — причина не поймана (теперь отпечаток пишется в лог).
-  Диагностика (dev): `[Gen]` отпечаток генерации, `[Lock]` кто запирает движение; dev-команды `ls` («|» как разделитель для
-  имён со слэшем), `ent <id>`, `rooms`, `unlock`, `free`, `doors` со состоянием; route-test повторяет дверь после killall/unlock.
-- Не закрыто: бочка с порохом (видео взрыва башни) — у клиента видео не показывается, забег окончен для обоих;
-  объекты «leftover», упавшие за карту, падают вечно (лишний трафик); предсказание движения (NetPredict) не проверено;
-  генерация пещер использует несидированный System.Random (RoomGenerator.GenerateCave) — ждёт проверки.
-- Фаза 1б, 6 — не начаты.
+## Status (2026-10-12)
+- Phase 0 — done: the "input→screen" HUD (client), `net sim N` for ping emulation.
+- Phase 1a — done: delay = ping + ~26 ms (measured: ping 100 → 132 ms, ping 240 → 265 ms).
+- Phase 2 — mostly done: world objects (animator/physics/Trap/Lever/Damagable/chest) are registered and included in snapshots;
+  on the client the trap/lever/damageable logic is muted (47 types); enemy health → damage texture; world sound (drums);
+  decoration alignment by path hashes (via a list of disabled objects); "lights out" is forwarded; objects created by the host
+  on the fly (monsters from pits, the hammer guy) are created on the client from a prefab.
+  Closed on Oct 12 (evening): object paths — names containing "/" ("Window 6/4") and "#" ("Door #1") broke path parsing, the separators were replaced
+  with service characters → the balcony synchronizes completely (458/458 objects), hubs without losses; the deleting randomizers are seeded.
+- Phase 3 — done: "current player" swap for the second character's coroutines (and for coroutines started during the swap — the banana),
+  for physics callbacks (171) with the second character's collider, for Update of components on its object (142); weapon hit on "player only" targets.
+  Verified: the banana on the second player ends.
+- Phase 4 — partly: the choice window (InteractionWindow) is forwarded to the client (open/close, appearance, binding); client restart →
+  a request to the host with a "Start over / No" window (verified). Not done: camera/fog on the client after death = partner.
+- Phase 4 (camera): done — after death, the client's game treats the partner as "the player" (camera, fog, lighting), and its own character again after revival.
+- Phase 5 — done: the second character's transformation (monster potion, genie, Evelius) runs under the swap, and the new body is rebound as the second player;
+  the client receives the body form in PlayerState and creates a puppet from the same prefab (verified: monster, the client walks with it).
+- Randomizers (jars, bombs, monsters in windows): before each decision the generators (UnityEngine.Random and ThreadAwareRandom)
+  are reseeded with "room+path+run seed", and the state afterwards is restored (otherwise tower generation broke).
+- Oct 12 (evening), 0.3.4: balcony — bird, trap doors, drop zone, the companion trap on the host only, wind from the shared seed;
+  character shadows, stomper dust, fx_* effects are not registered (cosmetics, −80 objects per room);
+  Evelius in hubs — his logic does not run on the client (previously he self-destructed based on the puppet's position), a surplus Evelius
+  is removed if the host did not register him. Verified by the autotest: dialogue windows open/close on the client,
+  "lights out" both ways, segments 1–3 are generated identically (`[Gen]` fingerprints match), bonus rooms, locked
+  rooms with levers. Once, the segment 3 room was not found on the client — the cause was not caught (the fingerprint is now written to the log).
+  Diagnostics (dev): `[Gen]` generation fingerprint, `[Lock]` who locks movement; dev commands `ls` ("|" as a separator for
+  names with a slash), `ent <id>`, `rooms`, `unlock`, `free`, `doors` with state; route-test repeats the door after killall/unlock.
+- Not closed: the powder keg (tower explosion video) — the video is not shown on the client, the run is over for both;
+  "leftover" objects that fell off the map fall forever (extra traffic); movement prediction (NetPredict) is unverified;
+  cave generation uses an unseeded System.Random (RoomGenerator.GenerateCave) — awaiting verification.
+- Phases 1b, 6 — not started.
 
-## Сетевая лаборатория и плавность (0.3.6, 12.10)
-Стенд `tools\net-quality.ps1`: две копии через localhost, на обеих имитация канала (`net link <профиль>` / `--coop-link`,
-профили lan/good/wifi/bad/awful: задержка, джиттер, потери, ширина), оба персонажа ходят туда-обратно, клиент меряет
-задержку ввода (p50/p95), рывки напарника (кадры, где показанный сдвиг расходится со скоростью), провалы потока,
-поправки своего персонажа. Таблица — в консоль и `docs\net-quality-last.csv` (не в git).
-Что сделано по его замерам:
-- Буфер интерполяции (`Net.InterpolationBuffer`, по умолчанию вкл.): клиент показывает напарника и мир в момент
-  «время хоста − (интервал снапшотов + джиттер)», часы хоста оцениваются по меткам времени снапшотов, время показа
-  непрерывно (0,94…1,06 от реального), при нехватке данных — экстраполяция до 100 мс.
-- Метки времени: реальное время хоста; снапшоты игроков — время последнего шага физики (персонажи двигаются
-  шагами физики 50 Гц, кадров 60 — метка кадра давала «замирания»).
-- Расписание отправки от прошлого срока: раньше при 60 кадрах/с снапшоты и ввод шли 30–45 раз в секунду.
-- Предсказание своего персонажа сверяется с хостом по номеру нажатия (позиция у хоста, когда он применил нажатие N,
-  против позиции, где мы показывали себя при отправке N): резких поправок при большом пинге больше нет.
+## Network lab and smoothness (0.3.6, Oct 12)
+The `tools\net-quality.ps1` bench: two copies over localhost, both with link emulation (`net link <profile>` / `--coop-link`,
+profiles lan/good/wifi/bad/awful: delay, jitter, loss, bandwidth), both characters walk back and forth, the client measures
+input delay (p50/p95), the partner's hitches (frames where the displayed shift diverges from the velocity), stream gaps,
+corrections of its own character. The table goes to the console and to `docs\net-quality-last.csv` (not in git).
+What was done based on its measurements:
+- Interpolation buffer (`Net.InterpolationBuffer`, on by default): the client shows the partner and the world at the moment
+  "host time − (snapshot interval + jitter)", the host clock is estimated from snapshot timestamps, display time
+  is continuous (0.94…1.06 of real time), and when data runs short — extrapolation up to 100 ms.
+- Timestamps: the host's real time; player snapshots — the time of the last physics step (characters move
+  in 50 Hz physics steps, frames are 60 — the frame timestamp produced "freezes").
+- Send schedule counted from the previous deadline: previously at 60 frames/s snapshots and input went out 30–45 times a second.
+- Prediction of its own character is reconciled with the host by press number (the position on the host when it applied press N,
+  versus the position where we showed ourselves when sending N): no more sharp corrections at high ping.
 
-| Канал | Рывки напарника: было → стало | Поправки своего персонажа: было → стало |
+| Link | Partner hitches: before → after | Own character corrections: before → after |
 |---|---|---|
-| lan | 0,5 % → 0,4 % | 0 → 0 |
-| good (25±6 мс, 0,5 %) | 0,9 % → 0,2 % | 0 → 0 |
-| wifi (40±30 мс, 2 %) | 2,8 % → 0,4 % | 0 → 0 |
-| bad (90±60 мс, 5 %, 96 кБ/с) | 8,0 % → 1,9 % | 3 → 0 |
-| awful (160±100 мс, 10 %, 48 кБ/с) | 10,0 % → 1,2 % | 3–4 → 0 |
+| lan | 0.5% → 0.4% | 0 → 0 |
+| good (25±6 ms, 0.5%) | 0.9% → 0.2% | 0 → 0 |
+| wifi (40±30 ms, 2%) | 2.8% → 0.4% | 0 → 0 |
+| bad (90±60 ms, 5%, 96 kB/s) | 8.0% → 1.9% | 3 → 0 |
+| awful (160±100 ms, 10%, 48 kB/s) | 10.0% → 1.2% | 3–4 → 0 |
 
-Цена: напарник показывается на 30–60 мс позже (на хорошем канале ~45 мс). Задержка ввода не изменилась,
-в локальной сети стала меньше (28 → 21 мс в среднем) из-за ровного темпа отправки.
-Дальше по качеству: анимации применяются при получении, а позиция — с задержкой буфера (рассогласование ~45 мс);
-враги (тоже физика) идут в снапшотах мира 20 Гц с меткой кадра.
+The cost: the partner is shown 30–60 ms later (about 45 ms on a good link). Input delay did not change,
+and on a LAN it dropped (28 → 21 ms on average) thanks to the even send pace.
+Further on quality: animations are applied on receipt, while the position is applied with the buffer delay (a mismatch of ~45 ms);
+enemies (also physics) travel in 20 Hz world snapshots with the frame's timestamp.
 
-## Steam-участок (0.3.5, 12.10)
-Разбор по коду и замеры без второго аккаунта Steam:
-- CoopNet спал по 15,5 мс вместо 1 мс: процесс .NET без timeBeginPeriod получает грубый таймер Windows, на нём же тикал LiteNetLib.
-  Каждый пакет ждал до двух таких тиков в каждом CoopNet: оценка +30…60 мс к задержке и рывки. Исправлено: timeBeginPeriod(1)
-  в CoopNet и в игре на время сессии, TriggerUpdate после отправки. Самопроверка при старте CoopNet пишет в лог `timer: Sleep(1) = 1.6 ms`.
-- Участок игра–CoopNet был целиком ReliableOrdered: ненадёжные снапшоты становились надёжными и при подвисании вставали в очередь.
-  Теперь надёжность сохраняется в обе стороны (слишком большие — надёжно).
-- Надёжные сообщения в Steam шли с Нейглом (до 5 мс) — теперь ReliableNoNagle.
-- Измерения Steam-участка: CoopNet раз в секунду шлёт `stats` (пинг, потери в обе стороны, кБ/с, лимит скорости Steam, байты в очереди,
-  время в очереди, ретранслятор или напрямую). Видно в строке статуса (F7), в `net status`, в логе `[Steam]` раз в 10 с и сразу при
-  потерях > 2 % или очереди > 50 мс.
-- Трафик хоста (Direct, замер): обычные комнаты 5–8 кБ/с, балкон в среднем 29, пик 42 кБ/с; регистрация балкона ≈ 22 пакета по ~1 кБ.
-  Сжимать пути хэшами пока не нужно; вернуться, если `[Steam]` покажет очередь при входе в комнаты.
-- Не проверено вживую: соединение двух аккаунтов (нужен второй аккаунт + Sandboxie, `Онлайн Steam на одном ПК.cmd`).
+## Steam segment (0.3.5, Oct 12)
+Code review and measurements without a second Steam account:
+- CoopNet slept 15.5 ms instead of 1 ms: a .NET process without timeBeginPeriod gets the coarse Windows timer, and LiteNetLib ticked on it as well.
+  Every packet waited up to two such ticks in each CoopNet: an estimated +30…60 ms of delay and hitches. Fixed: timeBeginPeriod(1)
+  in CoopNet and in the game for the duration of the session, TriggerUpdate after sending. The self-check at CoopNet start writes `timer: Sleep(1) = 1.6 ms` to the log.
+- The game–CoopNet segment was entirely ReliableOrdered: unreliable snapshots became reliable and queued up on a stall.
+  Now reliability is preserved in both directions (messages that are too large go reliable).
+- Reliable messages in Steam went out with Nagle (up to 5 ms); now ReliableNoNagle.
+- Steam segment measurements: once a second CoopNet sends `stats` (ping, loss in both directions, kB/s, Steam's rate limit, bytes in the queue,
+  time in the queue, relay or direct). Visible in the status line (F7), in `net status`, in the log as `[Steam]` every 10 s and immediately on
+  loss > 2% or queue > 50 ms.
+- Host traffic (Direct, measured): ordinary rooms 5–8 kB/s, balcony 29 on average, peak 42 kB/s; balcony registration ≈ 22 packets of ~1 kB each.
+  Compressing paths into hashes is not needed yet; come back to it if `[Steam]` shows a queue when entering rooms.
+- Not verified live: a connection between two accounts (needs a second account + Sandboxie, `Online Steam on one PC.cmd`).
 
-## Про транспорт
-Steam (Spacewar) остаётся: лобби/приглашения/NAT без зависимости от нашего сервера. Свой релей в США увеличил бы путь.
-Возможная замена внутри Steam: `SteamNetworkingSockets` вместо `SteamNetworkingMessages` (лучше контроль надёжности/буферов) — после фазы 0, если измерения покажут потери.
+## About the transport
+Steam (Spacewar) stays: lobbies/invitations/NAT with no dependency on our own server. Our own relay in the US would lengthen the path.
+A possible replacement inside Steam: `SteamNetworkingSockets` instead of `SteamNetworkingMessages` (better control over reliability/buffers) — after phase 0, if measurements show losses.

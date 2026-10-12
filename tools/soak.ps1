@@ -1,6 +1,6 @@
-# Прогон на износ: хост (47800) и клиент (47801) случайно играют N секунд.
-# Каждые несколько ходов — пауза без ввода и сверка: та же комната, позиция персонажа клиента у хоста (P2) и у клиента (P1).
-# В конце — сводка ресинхронизаций и ошибок из логов.
+﻿# Endurance run: host (47800) and client (47801) play randomly for N seconds.
+# Every few ticks: pause input and cross-check - same room, and the client character's position on the host (P2) vs. on the client (P1).
+# At the end: summary of resyncs and errors from the logs.
 param([int]$Seconds = 180, [switch]$NoLaunch, [switch]$Desync)
 $t = $PSScriptRoot
 . "$t\devlib.ps1"
@@ -28,7 +28,7 @@ while ((Get-Date) -lt $end) {
     if ($Desync -and $tick % 25 -eq 0) { "tick ${tick}: $(DevB 'net desync 3')" }
     Start-Sleep -Milliseconds 600
     if ($tick % 6 -eq 0) {
-        Start-Sleep -Milliseconds 1500   # даём персонажам остановиться и снапшотам дойти
+        Start-Sleep -Milliseconds 1500   # let the characters stop and snapshots arrive
         $wa = DevA where; $wb = DevB where
         $ra = Get-Room $wa; $rb = Get-Room $wb; $rooms[$ra] = 1
         $checks++
