@@ -33,6 +33,8 @@ namespace LuckyTowerCoop.Net
         private readonly NetClock m_clock = new NetClock();
         private float m_delaySeat = 0.05f;
         private float m_delayWorld = 0.08f;
+        private readonly NetClock.RenderTrack m_trackSeat = new NetClock.RenderTrack();
+        private readonly NetClock.RenderTrack m_trackWorld = new NetClock.RenderTrack();
 
         public float ShowDelayMs => (CoopConfig.NetInterp.Value ? m_delaySeat : 0f) * 1000f;
 
@@ -1171,7 +1173,8 @@ namespace LuckyTowerCoop.Net
             m_clock.OnSample(hostTime);
             bool seatPacket = false;
             int layer = r.GetInt();
-            m_sender.OnAck(r.GetUShort());
+            ushort ackSeq = r.GetUShort();
+            m_sender.OnAck(ackSeq);
             int n = r.GetUShort();
             if (layer != LayerManager.CurrentPlayerLayer && layer >= 0)
             {
@@ -1229,6 +1232,10 @@ namespace LuckyTowerCoop.Net
                 e.HasTarget = true;
                 e.Vel = vel;
                 e.SnapTime = Time.unscaledTime;
+                if (id == NetPaths.SeatB)
+                {
+                    Reconcile(ackSeq, x);
+                }
                 if (CoopConfig.NetInterp.Value)
                 {
                     (e.Interp ??= new InterpBuffer()).Add(hostTime, e.TargetPos, rot, e.TargetFlip, vel,
@@ -1758,12 +1765,10 @@ namespace LuckyTowerCoop.Net
                 // показываем мир в прошлом на «интервал снапшотов + джиттер»: тогда почти всегда есть два снапшота вокруг
                 // момента показа. Задержка меняется плавно, чтобы время показа не прыгало.
                 float jit = Mathf.Min(m_clock.Jitter, 0.25f);
-                float a = 1f - Mathf.Exp(-1.5f * dt);
-                m_delaySeat = Mathf.Lerp(m_delaySeat, NetConst.SeatSnapshotInterval + jit + 0.008f, a);
-                m_delayWorld = Mathf.Lerp(m_delayWorld, NetConst.SnapshotInterval + jit + 0.012f, a);
-                double hostNow = m_clock.HostNow;
-                rtSeat = (float)(hostNow - m_delaySeat);
-                rtWorld = (float)(hostNow - m_delayWorld);
+                m_delaySeat = NetConst.SeatSnapshotInterval + jit + 0.008f;
+                m_delayWorld = NetConst.SnapshotInterval + jit + 0.012f;
+                rtSeat = m_trackSeat.Time(m_clock, m_delaySeat, dt);
+                rtWorld = m_trackWorld.Time(m_clock, m_delayWorld, dt);
             }
             float k = 1f - Mathf.Exp(-15f * dt);
             foreach (var e in m_byId.Values)
@@ -1840,6 +1845,48 @@ namespace LuckyTowerCoop.Net
 
         private static readonly int[] s_predMask = new int[1];
 
+        // сверка предсказания: где мы показывали своего персонажа, когда отправили нажатие №N, и где он у хоста,
+        // когда хост это нажатие применил. Разница — настоящая ошибка предсказания (без отставания на пинг).
+        private readonly ushort[] m_predSeq = new ushort[64];
+        private readonly float[] m_predX = new float[64];
+        private readonly bool[] m_predValid = new bool[64];
+        private float m_predShift;
+        private float m_predActiveAt = -10f;
+        private float m_lastMoveInputAt = -10f;
+
+        private void Reconcile(ushort ack, float hostX)
+        {
+            if (!CoopConfig.NetPredict.Value || Time.unscaledTime - m_predActiveAt > 0.2f)
+            {
+                return;
+            }
+            int i = ack & 63;
+            if (!m_predValid[i] || m_predSeq[i] != ack)
+            {
+                return;
+            }
+            m_predValid[i] = false; // одно нажатие сверяем один раз
+            float err = hostX - m_predX[i];
+            NetQuality.OnReconcile(err);
+            float shift = Mathf.Abs(err) > 1.5f ? err : err * 0.2f; // мелкое — плавно, большое (толчок, телепорт) — сразу
+            if (Mathf.Abs(err) > 1.5f)
+            {
+                NetQuality.OnCorrectionSnap();
+            }
+            if (Mathf.Abs(shift) < 0.0005f)
+            {
+                return;
+            }
+            m_predShift += shift;
+            for (int k = 0; k < 64; k++)
+            {
+                if (m_predValid[k] && (short)(m_predSeq[k] - ack) > 0)
+                {
+                    m_predX[k] += shift; // более поздние предсказания уже учли бы эту поправку
+                }
+            }
+        }
+
         /// <summary>Горизонтальное движение своего персонажа — от локального ввода; вертикаль и всё остальное — от хоста.</summary>
         private bool PredictOwn(NetEntity e, float k)
         {
@@ -1862,14 +1909,31 @@ namespace LuckyTowerCoop.Net
             float dt = Time.unscaledDeltaTime;
             var t = e.T;
             var pos = t.position;
+            if (Time.unscaledTime - m_predActiveAt > 0.2f)
+            {
+                // предсказание только что включилось (после двери, смерти, окна) — старая история не годится
+                System.Array.Clear(m_predValid, 0, m_predValid.Length);
+                m_predShift = 0f;
+            }
+            m_predActiveAt = Time.unscaledTime;
+            pos.x += m_predShift;
+            m_predShift = 0f;
             var host = e.TargetPos + (Vector3)(e.Vel * Mathf.Min(Time.unscaledTime - e.SnapTime, 0.1f));
-            if ((host - pos).sqrMagnitude > 2.25f)
+            float speed = Mathf.Abs(e.Vel.x) > 0.5f ? Mathf.Abs(e.Vel.x) : own.Stats.MovementSpeed * 2f * own.Stats.MovementSpeedMultiplier;
+            float rtt = Mathf.Clamp(m_sender.AppliedLagMs / 1000f, 0.03f, 1f);
+            // хост показывает нас с отставанием на пинг: допустимое расхождение растёт с пингом
+            float allowed = speed * (rtt + 0.2f) + 1.5f;
+            if ((host - pos).sqrMagnitude > allowed * allowed)
             {
                 NetQuality.OnCorrectionSnap();
-                t.position = host; // сильно разошлись (телепорт, дверь) — верим хосту
+                t.position = host; // разошлись сильнее, чем объясняет пинг (телепорт, дверь) — верим хосту
+                System.Array.Clear(m_predValid, 0, m_predValid.Length);
                 return true;
             }
-            float speed = Mathf.Abs(e.Vel.x) > 0.5f ? Mathf.Abs(e.Vel.x) : own.Stats.MovementSpeed * 2f * own.Stats.MovementSpeedMultiplier;
+            if (dir != 0f)
+            {
+                m_lastMoveInputAt = Time.unscaledTime;
+            }
             if (dir != 0f && speed > 0.1f)
             {
                 float step = dir * speed * dt;
@@ -1878,7 +1942,7 @@ namespace LuckyTowerCoop.Net
                     pos.x += step;
                 }
                 float lead = pos.x - host.x;
-                float maxLead = speed * 0.25f + 0.3f; // не убегаем от хоста дальше, чем на четверть секунды пути
+                float maxLead = speed * (rtt + 0.1f) + 0.3f;
                 if (Mathf.Abs(lead) > maxLead)
                 {
                     pos.x = host.x + Mathf.Sign(lead) * maxLead;
@@ -1892,9 +1956,14 @@ namespace LuckyTowerCoop.Net
             }
             else
             {
-                pos.x = Mathf.Lerp(pos.x, host.x, k);
+                // отпустили: хост ещё идёт пинг-времени и остановится там, где мы уже стоим. Сверка подправит;
+                // к хосту тянемся, только когда он точно остановился
+                if (Time.unscaledTime - m_lastMoveInputAt > rtt + 0.3f)
+                {
+                    pos.x = Mathf.Lerp(pos.x, host.x, k);
+                }
                 var scale = t.localScale;
-                if ((scale.x < 0f) != e.TargetFlip)
+                if ((scale.x < 0f) != e.TargetFlip && Time.unscaledTime - m_lastMoveInputAt > rtt + 0.1f)
                 {
                     scale.x = -scale.x;
                     t.localScale = scale;
@@ -1902,6 +1971,10 @@ namespace LuckyTowerCoop.Net
             }
             pos.y = Mathf.Lerp(pos.y, host.y, k);
             t.position = pos;
+            ushort sent = m_sender.LastSentSeq;
+            m_predSeq[sent & 63] = sent;
+            m_predX[sent & 63] = pos.x;
+            m_predValid[sent & 63] = true;
             var euler = t.eulerAngles;
             if (Mathf.Abs(Mathf.DeltaAngle(euler.z, e.TargetRot)) > 0.1f)
             {

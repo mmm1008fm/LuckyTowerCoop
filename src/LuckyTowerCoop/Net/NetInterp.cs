@@ -23,11 +23,17 @@ namespace LuckyTowerCoop.Net
 
         public bool Ready => m_has;
 
-        public double HostNow => LocalNow + m_offset;
+        public double HostNow => UnityEngine.Time.realtimeSinceStartupAsDouble + m_offset;
+
+        // приём и показ — по часам Unity: показ привязан к началу кадра, иначе шаг движения зависел бы от того,
+        // в какой момент кадра мы рисуем (неровные кадры давали «замирания»)
+        private static double RecvNow => UnityEngine.Time.realtimeSinceStartupAsDouble;
+
+        private static double FrameNow => UnityEngine.Time.unscaledTimeAsDouble;
 
         public void OnSample(float hostTime)
         {
-            double local = LocalNow;
+            double local = RecvNow;
             double s = hostTime - local;
             if (!m_has || s > m_offset || s < m_offset - 1.0)
             {
@@ -49,6 +55,32 @@ namespace LuckyTowerCoop.Net
         {
             m_has = false;
             m_jitter = 0f;
+        }
+
+        /// <summary>
+        /// Непрерывное время показа «время хоста − задержка»: оценка смещения часов и задержка меняются скачками,
+        /// а показ — нет: время показа идёт со скоростью 0,94…1,06 от реальной, пока не догонит цель.
+        /// </summary>
+        public sealed class RenderTrack
+        {
+            private double m_off;
+            private bool m_init;
+
+            public float Time(NetClock clock, float delay, float dt)
+            {
+                double target = clock.m_offset - delay;
+                if (!m_init || Math.Abs(target - m_off) > 0.5)
+                {
+                    m_off = target;
+                    m_init = true;
+                }
+                else
+                {
+                    double step = 0.06 * dt;
+                    m_off += Math.Max(-step, Math.Min(step, target - m_off));
+                }
+                return (float)(FrameNow + m_off);
+            }
         }
     }
 
@@ -187,6 +219,8 @@ namespace LuckyTowerCoop.Net
         private static int s_movingFrames;
         private static int s_hitchFrames;
         private static int s_extrapFrames;
+        private static int s_stalls;
+        private static int s_jumps;
         private static int s_snaps;
         private static int s_gaps;
         private static double s_lastSeatPacket;
@@ -201,11 +235,16 @@ namespace LuckyTowerCoop.Net
             s_movingFrames = 0;
             s_hitchFrames = 0;
             s_extrapFrames = 0;
+            s_stalls = 0;
+            s_jumps = 0;
             s_snaps = 0;
             s_gaps = 0;
             s_maxGapMs = 0f;
             s_hasPrev = false;
             s_since = NetClock.LocalNow;
+            s_errSum = 0f;
+            s_errN = 0;
+            s_errMax = 0f;
         }
 
         public static void OnInputLag(float ms)
@@ -248,9 +287,15 @@ namespace LuckyTowerCoop.Net
                 {
                     s_movingFrames++;
                     float moved = (shown - s_prevPartner).magnitude;
-                    if (moved < expected * 0.35f || moved > expected * 2.5f)
+                    if (moved < expected * 0.35f)
                     {
                         s_hitchFrames++;
+                        s_stalls++;
+                    }
+                    else if (moved > expected * 2.5f)
+                    {
+                        s_hitchFrames++;
+                        s_jumps++;
                     }
                     if (extrapolated)
                     {
@@ -263,6 +308,22 @@ namespace LuckyTowerCoop.Net
         }
 
         public static void OnCorrectionSnap() => s_snaps++;
+
+        private static float s_errSum;
+        private static int s_errN;
+        private static float s_errMax;
+
+        /// <summary>Сверка предсказания своего персонажа с хостом (по номеру нажатия): насколько ошиблись.</summary>
+        public static void OnReconcile(float err)
+        {
+            err = Math.Abs(err);
+            s_errSum += err;
+            s_errN++;
+            if (err > s_errMax)
+            {
+                s_errMax = err;
+            }
+        }
 
         public static string Report(string mode, float delayMs, float jitterMs)
         {
@@ -278,9 +339,9 @@ namespace LuckyTowerCoop.Net
             float hitch = s_movingFrames > 0 ? 100f * s_hitchFrames / s_movingFrames : 0f;
             float extrap = s_movingFrames > 0 ? 100f * s_extrapFrames / s_movingFrames : 0f;
             return string.Format(System.Globalization.CultureInfo.InvariantCulture,
-                "mode={0} link={1} secs={2:F0} lag50={3:F0} lag95={4:F0} hitch={5:F1}% movingFrames={6} extrap={7:F1}% gaps={8} maxGap={9:F0} snaps={10} delay={11:F0} jitter={12:F0} dropped={13} retrans={14}",
+                "mode={0} link={1} secs={2:F0} lag50={3:F0} lag95={4:F0} hitch={5:F1}% movingFrames={6} extrap={7:F1}% gaps={8} maxGap={9:F0} snaps={10} delay={11:F0} jitter={12:F0} dropped={13} retrans={14} ownErr={15:F2} ownErrMax={16:F2} stalls={17} jumps={18}",
                 mode, NetLinkSim.Current.Name, NetClock.LocalNow - s_since, p50, p95, hitch, s_movingFrames, extrap, s_gaps, s_maxGapMs, s_snaps,
-                delayMs, jitterMs, NetLinkSim.Dropped, NetLinkSim.Retransmitted);
+                delayMs, jitterMs, NetLinkSim.Dropped, NetLinkSim.Retransmitted, s_errN > 0 ? s_errSum / s_errN : 0f, s_errMax, s_stalls, s_jumps);
         }
     }
 }

@@ -99,5 +99,12 @@ namespace LuckyTowerCoop.Net
         public const float SeatSnapshotInterval = 1f / 60f;
         public const float InputInterval = 1f / 60f;
         public const int MaxPacket = 960; // LiteNetLib Unreliable: максимум 1023 байта на пакет
+
+        /// <summary>Следующий срок периодической отправки: от прошлого срока (ровный темп), после долгой паузы — от «сейчас».</summary>
+        public static float NextTick(float due, float now, float interval)
+        {
+            due += interval;
+            return due < now - interval ? now + interval : due;
+        }
     }
 }

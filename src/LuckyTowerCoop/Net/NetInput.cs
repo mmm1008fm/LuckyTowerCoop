@@ -43,6 +43,9 @@ namespace LuckyTowerCoop.Net
         /// <summary>Сглаженное время «ввод отправлен → хост применил и прислал снапшот», мс (замер фазы 0).</summary>
         public float AppliedLagMs { get; private set; }
 
+        /// <summary>Номер последнего отправленного пакета ввода (для сверки предсказания).</summary>
+        public ushort LastSentSeq => (ushort)(m_seq - 1);
+
         public void OnAck(ushort seq)
         {
             int i = seq & 63;
@@ -76,11 +79,11 @@ namespace LuckyTowerCoop.Net
                     m_downCounters[i] = (byte)((m_downCounters[i] + 1) & 15);
                 }
             }
-            if (Time.unscaledTime < m_next)
+            if (Time.unscaledTime < m_next - 0.002f)
             {
                 return;
             }
-            m_next = Time.unscaledTime + NetConst.InputInterval;
+            m_next = NetConst.NextTick(m_next, Time.unscaledTime, NetConst.InputInterval);
 
             ulong counters = 0;
             for (int i = 0; i < m_downCounters.Length; i++)

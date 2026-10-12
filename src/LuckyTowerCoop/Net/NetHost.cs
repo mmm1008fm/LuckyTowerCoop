@@ -219,14 +219,16 @@ namespace LuckyTowerCoop.Net
                 m_nextScan = now + 0.5f;
                 Scan();
             }
-            if (now >= m_nextSeatSnap)
+            // расписание копится от прошлого срока, а не от «сейчас»: иначе при 60 кадрах/с половина кадров
+            // пропускалась и снапшоты шли неровно, 30–45 раз в секунду
+            if (now >= m_nextSeatSnap - 0.002f)
             {
-                m_nextSeatSnap = now + NetConst.SeatSnapshotInterval;
+                m_nextSeatSnap = NetConst.NextTick(m_nextSeatSnap, now, NetConst.SeatSnapshotInterval);
                 SendSeatSnapshot();
             }
-            if (now >= m_nextSnap)
+            if (now >= m_nextSnap - 0.002f)
             {
-                m_nextSnap = now + NetConst.SnapshotInterval;
+                m_nextSnap = NetConst.NextTick(m_nextSnap, now, NetConst.SnapshotInterval);
                 SendAttachments();
                 SendSnapshot();
                 SendLooks(now);
@@ -669,10 +671,15 @@ namespace LuckyTowerCoop.Net
 
         // ================= снапшоты =================
 
-        private NetDataWriter BeginSnapshot(out int countPos)
+        private bool m_stampLogged;
+
+        private NetDataWriter BeginSnapshot(out int countPos, bool physicsStamp = false)
         {
             var w = m_s.Begin(Msg.Snapshot);
-            w.Put(Time.unscaledTime); // время хоста для буфера интерполяции у клиента (реальное, не игровое)
+            // время хоста для буфера интерполяции у клиента (реальное, не игровое). Персонажи двигаются шагами физики
+            // (50 в секунду), а кадров 60: метка кадра давала пары снапшотов с одной позицией и «замирания» у клиента.
+            // Поэтому снапшот игроков метим временем последнего шага физики.
+            w.Put(physicsStamp ? Time.fixedUnscaledTime : Time.unscaledTime);
             w.Put(LayerManager.CurrentPlayerLayer);
             w.Put(m_input.LastSeq); // замер задержки у клиента: последний применённый пакет ввода
             countPos = w.Length;
@@ -745,7 +752,14 @@ namespace LuckyTowerCoop.Net
         /// <summary>Персонажи игроков: 60 Гц, со скоростью (клиент экстраполирует между снапшотами).</summary>
         private void SendSeatSnapshot()
         {
-            var w = BeginSnapshot(out int countPos);
+            var rbA = SeatChar(Seat.A)?.Components.Rigidbody;
+            bool physicsStamp = rbA != null && rbA.interpolation == RigidbodyInterpolation2D.None;
+            if (!m_stampLogged && rbA != null)
+            {
+                m_stampLogged = true;
+                Plugin.Log.LogInfo($"[NetHost] seat snapshots stamped with {(physicsStamp ? "physics step time (rigidbody not interpolated)" : "frame time (rigidbody interpolated)")}");
+            }
+            var w = BeginSnapshot(out int countPos, physicsStamp);
             int count = 0;
             foreach (var seat in new[] { Seat.A, Seat.B })
             {

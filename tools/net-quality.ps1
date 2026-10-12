@@ -42,9 +42,9 @@ foreach ($p in $Profiles) {
             'lag50' = $f['lag50']; 'lag95' = $f['lag95']
             'hitch%' = $f['hitch'] -replace '%', ''; 'extrap%' = $f['extrap'] -replace '%', ''
             gaps = $f['gaps']; 'maxGap' = $f['maxGap']; delay = $f['delay']; jitter = $f['jitter']
-            snaps = $f['snaps']; dropped = $f['dropped']
+            snaps = $f['snaps']; dropped = $f['dropped']; stalls = $f['stalls']; jumps = $f['jumps']; ownErr = $f['ownErr']
         }
-        "{0,-6} {1,-6} lag50={2,4} lag95={3,4} hitch={4,5}% extrap={5,5}% gaps={6,3} maxGap={7,4} delay={8,3} jitter={9,3} snaps={10}" -f $p, $mode, $f['lag50'], $f['lag95'], ($f['hitch'] -replace '%', ''), ($f['extrap'] -replace '%', ''), $f['gaps'], $f['maxGap'], $f['delay'], $f['jitter'], $f['snaps']
+        "{0,-6} {1,-6} lag50={2,4} lag95={3,4} hitch={4,5}% extrap={5,5}% gaps={6,3} maxGap={7,4} delay={8,3} jitter={9,3} snaps={10} stall/jump={11}/{12} ownErr={13}" -f $p, $mode, $f['lag50'], $f['lag95'], ($f['hitch'] -replace '%', ''), ($f['extrap'] -replace '%', ''), $f['gaps'], $f['maxGap'], $f['delay'], $f['jitter'], $f['snaps'], $f['stalls'], $f['jumps'], $f['ownErr']
     }
 }
 DevA 'net link off' | Out-Null; DevB 'net link off' | Out-Null; DevB 'net interp buffer' | Out-Null
