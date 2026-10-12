@@ -5,7 +5,7 @@ It is a BepInEx mod. It does not modify game files and uninstalls with one click
 
 Current version: **0.3.7**. Both players must run the same version.
 
-[Русская версия](README.ru.md)
+[Russian version](README.ru.md)
 
 ---
 
@@ -13,8 +13,8 @@ Current version: **0.3.7**. Both players must run the same version.
 
 ### Installation
 1. Extract `LuckyTowerCoop_<version>.zip` anywhere.
-2. Run `Установить.cmd` (Install). It finds the game or asks for its folder, then installs BepInEx, the mod and the Steam module. Your settings are kept.
-3. To uninstall, run `Удалить.cmd` (Uninstall).
+2. Run `Install.cmd`. It finds the game or asks for its folder, then installs BepInEx, the mod and the Steam module. Your settings are kept.
+3. To uninstall, run `Uninstall.cmd`.
 
 ### Playing online
 Both players need Steam running. The mod connects through a separate `CoopNet.exe` process, which Steam shows as "Spacewar".
@@ -119,10 +119,10 @@ DevB 'net status'
 
 | Script | What it does |
 |---|---|
-| `Онлайн на одном ПК.cmd` / `tools\local-online.ps1` | two game instances over localhost, host on the left, client on the right |
+| `Online on one PC.cmd` / `tools\local-online.ps1` | two game instances over localhost, host on the left, client on the right |
 | `tools\route-test.ps1 -Rooms 10` | automated route through doors: rooms, entities, corpses, resyncs, errors |
 | `tools\net-quality.ps1` | network quality bench: emulated bad links and a table of delays and hitches |
-| `Онлайн Steam на одном ПК.cmd` | Steam on one PC: a second account in a Sandboxie-Plus sandbox |
+| `Online Steam on one PC.cmd` | Steam on one PC: a second account in a Sandboxie-Plus sandbox |
 | `tools\soak.ps1` | soak test with random input |
 
 Useful dev commands:

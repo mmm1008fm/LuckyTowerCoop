@@ -1,58 +1,58 @@
-# Онлайн-кооп: дизайн
+# Online co-op: design
 
-## Статус (v0.2.0)
-Проверено двумя копиями игры на одном ПК (Direct UDP через localhost):
-подключение и рукопожатие; загрузка сцены хоста с его сидом и сложностью (генерация совпала); синхронизация комнат,
-игроков, врагов (позиции и анимации), предметов; ввод клиента → его персонаж на хосте; голосование у дверей вводом
-клиента, «1/2» у клиента; переход между комнатами; обрыв (`net drop`) → пауза, окно хоста, смерть персонажа с выпадением
-вещей → автопереподключение → свежий персонаж; падение процесса клиента и подключение заново посреди забега;
-синхронизация трупов. Steam: `CoopNet.exe` инициализирует Spacewar и создаёт лобби (подключение второго аккаунта не проверено).
+## Status (v0.2.0)
+Verified with two game copies on one PC (Direct UDP over localhost):
+connection and handshake; loading the host's scene with its seed and difficulty (generation matched); synchronization of rooms,
+players, enemies (positions and animations), items; client input → its character on the host; door voting with client input,
+"1/2" on the client; moving between rooms; connection loss (`net drop`) → pause, host window, character death with item drop →
+auto-reconnect → a fresh character; client process crash and reconnecting mid-run;
+corpse synchronization. Steam: `CoopNet.exe` initializes Spacewar and creates a lobby (connecting a second account has not been verified).
 
-Отличия от исходного дизайна: окно переподключения не ограничено — пока хост не закрыл сессию, напарник может вернуться;
-при обрыве его персонаж погибает (вещи можно забрать), при возвращении появляется заново без вещей
-(если был мёртв — остаётся мёртвым до воскрешения).
+Differences from the original design: the reconnect window is unlimited - as long as the host has not closed the session, the partner can come back;
+on connection loss their character dies (items can be picked up), and on return it spawns anew without items
+(if it was dead, it stays dead until resurrected).
 
-## Модель
-**Хост-авторитет + клиент-зеркало.** Всю игру (ИИ, урон, двери, лут, смерть) считает только хост.
-Персонаж клиента на хосте — это второй игрок (P2) из локального коопа, его ввод приходит по сети
-(тот же механизм `InputOverrides`, что и у скриптового ввода). Клиент запускает ту же сцену с тем же сидом,
-но у себя ничего не симулирует: все персонажи, враги и предметы — «марионетки», которые повторяют снапшоты хоста.
+## Model
+**Host authority + client mirror.** Only the host simulates the game (AI, damage, doors, loot, death).
+The client's character on the host is the second player (P2) from local co-op, and its input arrives over the network
+(the same `InputOverrides` mechanism as scripted input). The client runs the same scene with the same seed,
+but simulates nothing locally: all characters, enemies and items are "puppets" that replay the host's snapshots.
 
-Плюсы: нет рассинхронизации логики (лут, урон, ИИ — в одном месте), минимум правок игры.
-Минус: задержка ввода у клиента = пинг (для неспешной Lucky Tower терпимо; предсказание — позже).
+Pros: no logic desync (loot, damage, AI live in one place), minimal changes to the game.
+Con: client input latency = ping (tolerable for the unhurried Lucky Tower; prediction later).
 
-## Транспорт
-| | Как | Зачем |
+## Transport
+| | How | Why |
 |---|---|---|
-| **Steam (Spacewar, AppID 480)** | отдельный процесс `CoopNet.exe` (.NET 8, Steamworks.NET 20.1.0 + Valve `steam_api64.dll`), лобби друзей, `SteamNetworkingMessages` (NAT/relay Valve). Плагин ↔ CoopNet по LiteNetLib на 127.0.0.1 | подключение без IP и портов |
-| **Direct UDP** | LiteNetLib в плагине, IP:порт | LAN / Tailscale / тесты двух копий на одном ПК |
+| **Steam (Spacewar, AppID 480)** | separate `CoopNet.exe` process (.NET 8, Steamworks.NET 20.1.0 + Valve `steam_api64.dll`), friends lobby, `SteamNetworkingMessages` (Valve NAT/relay). Plugin ↔ CoopNet over LiteNetLib on 127.0.0.1 | connecting without IPs and ports |
+| **Direct UDP** | LiteNetLib in the plugin, IP:port | LAN / Tailscale / tests with two copies on one PC |
 
-Почему отдельный процесс: в одном процессе Steam API работает под одним AppID, а игра уже инициализировала свой.
+Why a separate process: within one process the Steam API works under a single AppID, and the game has already initialized its own.
 
-## Сессия и обрыв связи
-- `Hello(версия протокола, имя, токен)` → `Welcome(токен сессии, сид забега)`. Несовпадение версии — отказ.
-- Heartbeat 2 Гц, таймаут 6 с.
-- **Обрыв у клиента**: хост ставит игру на паузу (`PauseOnDisconnect`) и показывает окно «Ждать / Играть одному / Закрыть сессию». Персонаж клиента погибает (вещи можно забрать). Клиент сам переподключается тем же токеном (или заново после перезапуска игры), хост делает полную пересинхронизацию (сцена → состояния мест → комната → сущности), персонаж появляется заново без вещей.
-- **Обрыв у хоста**: клиент замирает с сообщением и переподключается; забег живёт на хосте, пока его игра открыта.
+## Session and connection loss
+- `Hello(protocol version, name, token)` → `Welcome(session token, run seed)`. A version mismatch is rejected.
+- Heartbeat 2 Hz, timeout 6 s.
+- **Client connection loss**: the host pauses the game (`PauseOnDisconnect`) and shows a window "Wait / Play solo / Close session". The client's character dies (items can be picked up). The client reconnects by itself with the same token (or anew after restarting the game), the host does a full resync (scene → seat states → room → entities), and the character spawns anew without items.
+- **Host connection loss**: the client freezes with a message and keeps reconnecting; the run lives on the host as long as its game is open.
 
-## Синхронизация
-1. **Забег**: хост выбирает сид, шлёт `SceneLoad(сцена, сид)`; оба форсируют сид `SegmentManager` → одинаковая генерация.
-   Неслучайные места генератора (`new System.Random()`) переводятся на сид.
-2. **Комната**: `RoomEnter(имя, позиции, битовая маска activeSelf всей иерархии комнаты)` — клиент сам выполняет
-   смену комнаты (как `EnterDoorRoutine`, без логики) и выравнивает включённые объекты (рандомайзеры).
-3. **Сущности**: ID = хэш пути в иерархии комнаты; объекты, созданные во время игры (лут, броски) — `Spawn(id, ItemLibrary-имя)`.
-4. **Снапшоты** 20 Гц (ненадёжно): позиция, поворот, разворот, состояние аниматора по слоям, веса слоёв.
-5. **События** (надёжно): смерть, экипировка, «1/2» у дверей, счётчик воскрешения, game over, смена сцены.
-6. **Ввод клиента** 60 Гц (ненадёжно): маска зажатых кнопок + маска нажатий с прошлого пакета (тап не теряется).
+## Synchronization
+1. **Run**: the host picks a seed and sends `SceneLoad(scene, seed)`; both force the `SegmentManager` seed → identical generation.
+   Non-random spots of the generator (`new System.Random()`) are switched to the seed.
+2. **Room**: `RoomEnter(name, positions, bitmask of activeSelf over the whole room hierarchy)` - the client performs
+   the room change itself (like `EnterDoorRoutine`, without the logic) and aligns enabled objects (randomizers).
+3. **Entities**: ID = hash of the path in the room hierarchy; objects created during play (loot, throws) - `Spawn(id, ItemLibrary name)`.
+4. **Snapshots** 20 Hz (unreliable): position, rotation, flip, animator state per layer, layer weights.
+5. **Events** (reliable): death, equipment, "1/2" at doors, resurrection counter, game over, scene change.
+6. **Client input** 60 Hz (unreliable): mask of held buttons + mask of presses since the last packet (a tap is not lost).
 
-## Что у клиента отключено
-ИИ врагов/NPC, урон и смерть (кроме событий хоста), переходы между комнатами (кроме событий хоста),
-триггеры люков/проходов, game over, **сохранения** (сейв клиента не трогается), загрузка инвентаря из сейва,
-события анимаций у марионеток.
+## What is disabled on the client
+Enemy/NPC AI, damage and death (except host events), room transitions (except host events),
+hatch/passage triggers, game over, **saves** (the client's save is untouched), loading inventory from the save,
+animation events on puppets.
 
-## Риски
-- Генерация может разойтись (рандом в `OnEnable` комнат) → маска activeSelf + проверка числа объектов, расхождения в лог.
-- Объекты, созданные спавнерами врагов во время игры, могут не найтись по пути на клиенте → в лог, марионетка не создаётся.
-- Экипировка у марионеток вызывает игровые методы экипировки — возможны побочные эффекты.
-- Не синхронизируются (пока): реплики/субтитры, звуки анимаций марионеток, состояние деревни (у клиента своя), магазины/банк, катсцены.
-- Steam-транспорт проверяется только вживую двумя аккаунтами.
+## Risks
+- Generation may diverge (randomness in rooms' `OnEnable`) → activeSelf mask + object count check, mismatches go to the log.
+- Objects created by enemy spawners during play may not be found by path on the client → logged, no puppet is created.
+- Equipment on puppets calls the game's equip methods - side effects are possible.
+- Not synchronized (yet): lines/subtitles, puppet animation sounds, village state (the client has its own), shops/bank, cutscenes.
+- The Steam transport can only be verified live with two accounts.
