@@ -64,10 +64,9 @@ namespace LuckyTowerCoop.Net
             };
             m_listener.NetworkReceiveEvent += (peer, reader, channel, method) =>
             {
-                if (m_simMs > 0)
+                if (m_sim.Intercept(reader.RawData, reader.Position, reader.AvailableBytes, method == DeliveryMethod.ReliableOrdered))
                 {
-                    m_recvQ.Enqueue((UnityEngine.Time.realtimeSinceStartup + m_simMs / 1000f, Copy(reader.RawData, reader.Position, reader.AvailableBytes)));
-                    return;
+                    return; // сетевая лаборатория: пакет придёт позже (или потеряется)
                 }
                 Received?.Invoke(reader.RawData, reader.Position, reader.AvailableBytes);
             };
@@ -98,37 +97,15 @@ namespace LuckyTowerCoop.Net
         public void Poll()
         {
             m_manager.PollEvents();
-            if (m_simMs <= 0 && m_sendQ.Count == 0 && m_recvQ.Count == 0)
-            {
-                return;
-            }
-            float now = UnityEngine.Time.realtimeSinceStartup;
-            while (m_sendQ.Count > 0 && m_sendQ.Peek().due <= now)
-            {
-                var p = m_sendQ.Dequeue();
-                if (IsConnected)
-                {
-                    m_peer.Send(p.data, 0, p.data.Length, 0, p.delivery == Delivery.Reliable ? DeliveryMethod.ReliableOrdered : DeliveryMethod.Unreliable);
-                }
-            }
-            while (m_recvQ.Count > 0 && m_recvQ.Peek().due <= now)
-            {
-                var p = m_recvQ.Dequeue();
-                Received?.Invoke(p.data, 0, p.data.Length);
-            }
+            m_sim.Pump(m_deliver ??= (d, o, l) => Received?.Invoke(d, o, l));
         }
 
-        // --- отладка: имитация задержки сети на приёме (одна сторона); «net sim N» на обеих копиях = пинг 2N.
-        // Встроенная имитация LiteNetLib есть только в его DEBUG-сборке.
-        private int m_simMs;
-        private readonly Queue<(float due, byte[] data, Delivery delivery)> m_sendQ = new Queue<(float, byte[], Delivery)>();
-        private readonly Queue<(float due, byte[] data)> m_recvQ = new Queue<(float, byte[])>();
+        // --- сетевая лаборатория (NetLinkSim): задержка/джиттер/потери/ширина на приёме; профиль общий для процесса
+        private readonly NetLinkSim m_sim = new NetLinkSim();
+        private Action<byte[], int, int> m_deliver;
 
-        public void SimulateLatency(int oneWayMs)
-        {
-            m_simMs = oneWayMs;
-            m_status = System.Text.RegularExpressions.Regex.Replace(m_status, @" \[имитация[^\]]*\]", "") + (oneWayMs > 0 ? $" [имитация +{oneWayMs} мс]" : "");
-        }
+        /// <summary>Старая команда «net sim N»: только задержка N мс в одну сторону.</summary>
+        public void SimulateLatency(int oneWayMs) => NetLinkSim.Set(oneWayMs > 0 ? $"lat={oneWayMs}" : "off");
 
         private static byte[] Copy(byte[] data, int offset, int length)
         {

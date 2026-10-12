@@ -84,6 +84,7 @@ namespace LuckyTowerCoop.Net
         public AudioSource Audio;     // мир: зацикленный звук (барабанщики) — играет/нет
         public Vector2 Vel;      // клиент: скорость из снапшота (экстраполяция)
         public float SnapTime;   // клиент: когда пришёл снапшот
+        public InterpBuffer Interp; // клиент: снапшоты по времени хоста (буфер интерполяции)
 
         // хост: последняя отправленная сигнатура аниматора
         public uint AnimSig;

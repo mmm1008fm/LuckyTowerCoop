@@ -672,7 +672,7 @@ namespace LuckyTowerCoop.Net
         private NetDataWriter BeginSnapshot(out int countPos)
         {
             var w = m_s.Begin(Msg.Snapshot);
-            w.Put(Time.time);
+            w.Put(Time.unscaledTime); // время хоста для буфера интерполяции у клиента (реальное, не игровое)
             w.Put(LayerManager.CurrentPlayerLayer);
             w.Put(m_input.LastSeq); // замер задержки у клиента: последний применённый пакет ввода
             countPos = w.Length;

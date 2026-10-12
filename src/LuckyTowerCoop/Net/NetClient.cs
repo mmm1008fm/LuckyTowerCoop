@@ -28,6 +28,17 @@ namespace LuckyTowerCoop.Net
         private readonly NetInputSender m_sender = new NetInputSender();
         private readonly Dictionary<int, NetEntity> m_byId = new Dictionary<int, NetEntity>();
         private readonly NetEntity[] m_seatEntity = new NetEntity[2];
+
+        // буфер интерполяции: оценка времени хоста и задержка показа (подстраивается под джиттер сети)
+        private readonly NetClock m_clock = new NetClock();
+        private float m_delaySeat = 0.05f;
+        private float m_delayWorld = 0.08f;
+
+        public float ShowDelayMs => (CoopConfig.NetInterp.Value ? m_delaySeat : 0f) * 1000f;
+
+        public float JitterMs => m_clock.Jitter * 1000f;
+
+        internal string QualityReport() => NetQuality.Report(CoopConfig.NetInterp.Value ? "buffer" : "legacy", ShowDelayMs, JitterMs);
         private readonly string[] m_seatTeeth = new string[2];
         private readonly List<NetEntity> m_pendingAttach = new List<NetEntity>();
         private static readonly Dictionary<string, GameObject> s_originGo = new Dictionary<string, GameObject>();
@@ -1156,7 +1167,9 @@ namespace LuckyTowerCoop.Net
 
         private void OnSnapshot(NetDataReader r)
         {
-            r.GetFloat(); // время хоста
+            float hostTime = r.GetFloat(); // время хоста (реальное): по нему буфер интерполяции
+            m_clock.OnSample(hostTime);
+            bool seatPacket = false;
             int layer = r.GetInt();
             m_sender.OnAck(r.GetUShort());
             int n = r.GetUShort();
@@ -1181,6 +1194,11 @@ namespace LuckyTowerCoop.Net
                 if ((flags & 16) != 0)
                 {
                     hp = r.GetByte();
+                }
+                if (id == NetPaths.SeatA && !seatPacket)
+                {
+                    seatPacket = true;
+                    NetQuality.OnSeatPacket();
                 }
                 NetEntity e = id == NetPaths.SeatA ? SeatEntity(Seat.A) : id == NetPaths.SeatB ? SeatEntity(Seat.B) : (m_byId.TryGetValue(id, out var found) ? found : null);
                 if (e == null && id != NetPaths.SeatA && id != NetPaths.SeatB && !m_unresolved.Contains(id))
@@ -1211,6 +1229,11 @@ namespace LuckyTowerCoop.Net
                 e.HasTarget = true;
                 e.Vel = vel;
                 e.SnapTime = Time.unscaledTime;
+                if (CoopConfig.NetInterp.Value)
+                {
+                    (e.Interp ??= new InterpBuffer()).Add(hostTime, e.TargetPos, rot, e.TargetFlip, vel,
+                        e.Kind == EntityKind.Seat ? NetConst.SeatSnapshotInterval : NetConst.SnapshotInterval);
+                }
                 if ((flags & 16) != 0 && hp != e.HealthByte)
                 {
                     e.HealthByte = hp;
@@ -1727,13 +1750,31 @@ namespace LuckyTowerCoop.Net
 
         private void Interpolate()
         {
-            float k = 1f - Mathf.Exp(-15f * Time.unscaledDeltaTime);
+            float dt = Time.unscaledDeltaTime;
+            bool buffered = CoopConfig.NetInterp.Value && m_clock.Ready;
+            float rtSeat = 0f, rtWorld = 0f;
+            if (buffered)
+            {
+                // показываем мир в прошлом на «интервал снапшотов + джиттер»: тогда почти всегда есть два снапшота вокруг
+                // момента показа. Задержка меняется плавно, чтобы время показа не прыгало.
+                float jit = Mathf.Min(m_clock.Jitter, 0.25f);
+                float a = 1f - Mathf.Exp(-1.5f * dt);
+                m_delaySeat = Mathf.Lerp(m_delaySeat, NetConst.SeatSnapshotInterval + jit + 0.008f, a);
+                m_delayWorld = Mathf.Lerp(m_delayWorld, NetConst.SnapshotInterval + jit + 0.012f, a);
+                double hostNow = m_clock.HostNow;
+                rtSeat = (float)(hostNow - m_delaySeat);
+                rtWorld = (float)(hostNow - m_delayWorld);
+            }
+            float k = 1f - Mathf.Exp(-15f * dt);
             foreach (var e in m_byId.Values)
             {
-                Apply(e, k);
+                if (!buffered || e.Interp == null || !ApplyBuffered(e, rtWorld, 0.1f, out _, out _))
+                {
+                    Apply(e, k);
+                }
             }
-            // персонажи игроков: снапшоты 60 Гц — догоняем быстрее и экстраполируем по скорости
-            float kSeat = 1f - Mathf.Exp(-30f * Time.unscaledDeltaTime);
+            // персонажи игроков: снапшоты 60 Гц
+            float kSeat = 1f - Mathf.Exp(-30f * dt);
             for (int i = 0; i < 2; i++)
             {
                 var e = m_seatEntity[i];
@@ -1741,12 +1782,58 @@ namespace LuckyTowerCoop.Net
                 {
                     continue;
                 }
-                if (i == (int)Seat.B && CoopConfig.NetPredict.Value && PredictOwn(e, kSeat))
+                if (i == (int)Seat.B)
                 {
+                    // свой персонаж: минимальная задержка — предсказание или последний снапшот (буфер тут только мешал бы)
+                    if (!(CoopConfig.NetPredict.Value && PredictOwn(e, kSeat)))
+                    {
+                        Apply(e, kSeat);
+                    }
                     continue;
                 }
-                Apply(e, kSeat);
+                // напарник
+                if (buffered && e.Interp != null && ApplyBuffered(e, rtSeat, 0.1f, out bool extrapolated, out var shownVel))
+                {
+                    NetQuality.OnPartnerFrame(e.T.position, shownVel, dt, extrapolated);
+                }
+                else
+                {
+                    Apply(e, kSeat);
+                    NetQuality.OnPartnerFrame(e.T.position, e.Vel, dt, false);
+                }
             }
+        }
+
+        /// <summary>Поза из буфера интерполяции в момент времени хоста rt. false — буфер пуст.</summary>
+        private static bool ApplyBuffered(NetEntity e, float rt, float maxExtrapolate, out bool extrapolated, out Vector2 velocity)
+        {
+            extrapolated = false;
+            velocity = Vector2.zero;
+            if (!e.HasTarget || !e.Alive || e.Attached)
+            {
+                return true; // нечего двигать — и старому пути тоже
+            }
+            FreezeCorpse(e);
+            if (!e.Interp.Sample(rt, maxExtrapolate, out var pos, out var rot, out var flip, out extrapolated, out velocity))
+            {
+                return false;
+            }
+            var t = e.T;
+            pos.z = t.position.z;
+            t.position = pos;
+            var euler = t.eulerAngles;
+            if (Mathf.Abs(Mathf.DeltaAngle(euler.z, rot)) > 0.01f)
+            {
+                euler.z = rot;
+                t.eulerAngles = euler;
+            }
+            var scale = t.localScale;
+            if ((scale.x < 0f) != flip)
+            {
+                scale.x = -scale.x;
+                t.localScale = scale;
+            }
+            return true;
         }
 
         // ---------- предсказание: свой персонаж идёт по нажатию сразу, хост догоняет ----------
@@ -1778,6 +1865,7 @@ namespace LuckyTowerCoop.Net
             var host = e.TargetPos + (Vector3)(e.Vel * Mathf.Min(Time.unscaledTime - e.SnapTime, 0.1f));
             if ((host - pos).sqrMagnitude > 2.25f)
             {
+                NetQuality.OnCorrectionSnap();
                 t.position = host; // сильно разошлись (телепорт, дверь) — верим хосту
                 return true;
             }
@@ -1841,12 +1929,8 @@ namespace LuckyTowerCoop.Net
         /// <summary>Задержка «мой ввод → применён хостом → снапшот у меня», мс (0 — ещё не измерено).</summary>
         public float InputLagMs => m_sender.AppliedLagMs;
 
-        private static void Apply(NetEntity e, float k)
+        private static void FreezeCorpse(NetEntity e)
         {
-            if (!e.HasTarget || !e.Alive || e.Attached)
-            {
-                return;
-            }
             if (!e.CorpseFrozen && e.Kind == EntityKind.Character && e.Character != null && e.Character.Stats.Dead)
             {
                 // тело врага повторяет хоста: своя физика трупа у клиента уводила его в сторону
@@ -1856,6 +1940,15 @@ namespace LuckyTowerCoop.Net
                     rb.simulated = false;
                 }
             }
+        }
+
+        private static void Apply(NetEntity e, float k)
+        {
+            if (!e.HasTarget || !e.Alive || e.Attached)
+            {
+                return;
+            }
+            FreezeCorpse(e);
             var t = e.T;
             var pos = t.position;
             var target = e.TargetPos;

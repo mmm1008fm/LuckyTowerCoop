@@ -36,6 +36,7 @@ namespace LuckyTowerCoop
         public static ConfigEntry<float> NetReconnectSeconds;
         public static ConfigEntry<UnityEngine.KeyCode> NetMenuKey;
         public static ConfigEntry<bool> NetPredict;
+        public static ConfigEntry<bool> NetInterp;
 
         public static ConfigEntry<bool> DevServer;
 
@@ -70,6 +71,7 @@ namespace LuckyTowerCoop
             NetPauseOnDisconnect = cfg.Bind("Net", "PauseOnDisconnect", true, "Хост ставит игру на паузу, пока напарник переподключается.");
             NetReconnectSeconds = cfg.Bind("Net", "AutoContinueSeconds", 0f, "0 — ждать отключившегося напарника на паузе, пока хост сам не решит; >0 — через столько секунд снять паузу (вернуться он сможет всё равно).");
             NetMenuKey = cfg.Bind("Net", "MenuKey", UnityEngine.KeyCode.F7, "Клавиша меню онлайна.");
+            NetInterp = cfg.Bind("Net", "InterpolationBuffer", true, "Клиент: показывать мир чуть в прошлом и вести его между снапшотами хоста по времени (плавно при неровной сети). Выключено — старое догоняние последнего снапшота.");
             NetPredict = cfg.Bind("Net", "ClientPrediction", true, "Клиент: свой персонаж начинает идти сразу по нажатию, не дожидаясь ответа хоста (предсказание движения).");
 
             DevServer = cfg.Bind("Dev", "CommandServer", false, "UDP-сервер отладочных команд на 127.0.0.1 (для разработки).");

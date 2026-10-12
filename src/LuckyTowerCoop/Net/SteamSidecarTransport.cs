@@ -87,7 +87,7 @@ namespace LuckyTowerCoop.Net
                     Disconnected?.Invoke("CoopNet закрыт");
                 }
             };
-            m_listener.NetworkReceiveEvent += (p, reader, ch, method) => OnIpc(reader.RawData, reader.Position, reader.AvailableBytes);
+            m_listener.NetworkReceiveEvent += (p, reader, ch, method) => OnIpc(reader.RawData, reader.Position, reader.AvailableBytes, method == DeliveryMethod.ReliableOrdered);
         }
 
         /// <summary>Качество Steam-участка (раз в секунду из CoopNet).</summary>
@@ -185,7 +185,10 @@ namespace LuckyTowerCoop.Net
 
         // ---------- IPC ----------
 
-        private void OnIpc(byte[] data, int offset, int length)
+        private readonly NetLinkSim m_sim = new NetLinkSim();
+        private Action<byte[], int, int> m_deliver;
+
+        private void OnIpc(byte[] data, int offset, int length, bool reliable)
         {
             if (length < 1)
             {
@@ -193,7 +196,10 @@ namespace LuckyTowerCoop.Net
             }
             if (data[offset] == IpcData)
             {
-                Received?.Invoke(data, offset + 1, length - 1);
+                if (!m_sim.Intercept(data, offset + 1, length - 1, reliable)) // сетевая лаборатория поверх Steam
+                {
+                    Received?.Invoke(data, offset + 1, length - 1);
+                }
                 return;
             }
             if (data[offset] == IpcText)
@@ -304,6 +310,7 @@ namespace LuckyTowerCoop.Net
         public void Poll()
         {
             m_ipc.PollEvents();
+            m_sim.Pump(m_deliver ??= (d, o, l) => Received?.Invoke(d, o, l));
             if (m_process != null && m_process.HasExited && m_sidecar == null)
             {
                 m_status = $"CoopNet завершился (код {m_process.ExitCode}) — см. лог";

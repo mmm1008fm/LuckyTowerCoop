@@ -33,6 +33,10 @@ namespace LuckyTowerCoop.Dev
         private static bool s_god;
         private readonly float?[] m_walkTarget = new float?[2];
         private readonly float[] m_walkDeadline = new float[2];
+        // patrol: ходить туда-обратно между двумя точками до срока (стенд качества сети)
+        private readonly float[] m_patrolA = new float[2];
+        private readonly float[] m_patrolB = new float[2];
+        private readonly float[] m_patrolUntil = new float[2];
 
         private void Start()
         {
@@ -133,6 +137,14 @@ namespace LuckyTowerCoop.Dev
 
             for (int i = 0; i < 2; i++)
             {
+                if (m_walkTarget[i] == null && Time.realtimeSinceStartup < m_patrolUntil[i])
+                {
+                    // дошёл до края — разворот
+                    var pw = GamePlayer.VonWansts[i];
+                    float px = pw != null ? pw.transform.position.x : 0f;
+                    m_walkTarget[i] = Mathf.Abs(px - m_patrolA[i]) < Mathf.Abs(px - m_patrolB[i]) ? m_patrolB[i] : m_patrolA[i];
+                    m_walkDeadline[i] = Time.realtimeSinceStartup + 8f;
+                }
                 if (m_walkTarget[i] == null)
                 {
                     continue;
@@ -266,6 +278,24 @@ namespace LuckyTowerCoop.Dev
                                 s.Client?.RequestResync("dev");
                             }
                             break;
+                        case "link":
+                            // net link off|lan|good|wifi|bad|awful | lat=.. jit=.. loss=.. bw=..  (ставить на обеих копиях)
+                            return "link: " + Net.NetLinkSim.Set(args.Length > 2 ? string.Join(" ", args, 2, args.Length - 2) : "off");
+                        case "interp":
+                            // net interp buffer|legacy — буфер интерполяции у клиента
+                            if (args.Length > 2)
+                            {
+                                CoopConfig.NetInterp.Value = args[2] != "legacy";
+                            }
+                            return "interp: " + (CoopConfig.NetInterp.Value ? "buffer" : "legacy");
+                        case "quality":
+                            // net quality [reset] — метрики качества у клиента
+                            if (args.Length > 2 && args[2] == "reset")
+                            {
+                                Net.NetQuality.Reset();
+                                return "quality reset";
+                            }
+                            return s.Client != null ? s.Client.QualityReport() : "client only";
                         case "sim":
                             // net sim <мс в одну сторону> — имитация пинга на Direct (ставить на обеих копиях)
                             if (s.Transport is Net.LnlTransport lnl)
@@ -444,6 +474,17 @@ namespace LuckyTowerCoop.Dev
                                       $"target={Safe(() => d.TargetRoom != null ? d.TargetRoom.name : "-")} scene={d.LoadSceneName} enabled={d.enabled} opened={d.Opened} lock={d.LockOnEnable} current={Safe(() => (gm != null && d.Room == gm.CurrentRoom).ToString())} path={Safe(() => d.Room != null ? Net.NetPaths.Pretty(Net.NetPaths.PathOf(d.transform, d.Room.transform)) : "-")}");
                     }
                     return sb.Length > 0 ? sb.ToString() : "no doors";
+                }
+
+                case "patrol":
+                {
+                    // patrol p1|p2 x1 x2 секунд — ходить туда-обратно (стенд качества сети)
+                    int idx = args[1] == "p2" ? 1 : 0;
+                    m_patrolA[idx] = float.Parse(args[2], CultureInfo.InvariantCulture);
+                    m_patrolB[idx] = float.Parse(args[3], CultureInfo.InvariantCulture);
+                    m_patrolUntil[idx] = Time.realtimeSinceStartup + (args.Length > 4 ? float.Parse(args[4], CultureInfo.InvariantCulture) : 20f);
+                    m_walkTarget[idx] = null;
+                    return $"{args[1]} patrols {m_patrolA[idx]}..{m_patrolB[idx]}";
                 }
 
                 case "walkto":

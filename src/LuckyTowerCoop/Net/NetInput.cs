@@ -52,6 +52,7 @@ namespace LuckyTowerCoop.Net
             }
             float ms = (Time.unscaledTime - m_sentAt[i]) * 1000f;
             m_sentAt[i] = 0f;
+            NetQuality.OnInputLag(ms);
             AppliedLagMs = AppliedLagMs <= 0f ? ms : Mathf.Lerp(AppliedLagMs, ms, 0.2f);
         }
 

@@ -95,6 +95,13 @@ namespace LuckyTowerCoop.Net
                     case "--coop-devserver":
                         DevServer = true;
                         break;
+                    case "--coop-link":
+                        if (next != null && !next.StartsWith("--"))
+                        {
+                            Plugin.Log.LogInfo("[Launch] link: " + NetLinkSim.Set(next));
+                            i++;
+                        }
+                        break;
                     case "--coop-steam-host":
                         s_steamHost = true;
                         break;

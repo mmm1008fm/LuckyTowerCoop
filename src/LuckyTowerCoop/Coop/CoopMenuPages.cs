@@ -66,6 +66,7 @@ namespace LuckyTowerCoop.Coop
             Header("Сеть");
             Set(CoopConfig.NetPauseOnDisconnect, GUILayout.Toggle(CoopConfig.NetPauseOnDisconnect.Value, " Пауза, пока отключившийся напарник не вернётся"));
             Set(CoopConfig.NetPredict, GUILayout.Toggle(CoopConfig.NetPredict.Value, " Предсказание движения у клиента (идти сразу по нажатию)"));
+            Set(CoopConfig.NetInterp, GUILayout.Toggle(CoopConfig.NetInterp.Value, " Плавный показ мира у клиента (буфер интерполяции)"));
             Set(CoopConfig.NetReconnectSeconds, Slider("Продолжить без него через", CoopConfig.NetReconnectSeconds.Value, 0f, 600f, 30f, v => v <= 0f ? "решаю сам" : $"{v / 60f:0.#} мин"));
 
             GUILayout.Space(8);
