@@ -1,0 +1,11 @@
+decompiled/
+bin/
+obj/
+*.user
+.vs/
+save_backup/
+dist/
+
+*.zip
+.claude/
+

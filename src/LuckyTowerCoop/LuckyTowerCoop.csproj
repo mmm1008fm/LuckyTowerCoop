@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <AssemblyName>LuckyTowerCoop</AssemblyName>
+    <RootNamespace>LuckyTowerCoop</RootNamespace>
+    <Version>0.3.5</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <DebugType>embedded</DebugType>
+    <!-- Сетевые зависимости (LiteNetLib) кладём рядом с плагином -->
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+
+    <!-- Путь к игре можно переопределить: dotnet build -p:GameDir=... -->
+    <GameDir Condition="'$(GameDir)' == ''">D:\game\Lucky.Tower.Ultimate.v1.1.4</GameDir>
+    <ManagedDir>$(GameDir)\Lucky Tower Ultimate_Data\Managed</ManagedDir>
+    <BepInExDir>$(GameDir)\BepInEx</BepInExDir>
+    <PluginDir>$(BepInExDir)\plugins\LuckyTowerCoop</PluginDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="LiteNetLib" Version="2.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="BepInEx" HintPath="$(BepInExDir)\core\BepInEx.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(BepInExDir)\core\0Harmony.dll" Private="false" />
+    <Reference Include="Assembly-CSharp" HintPath="$(ManagedDir)\Assembly-CSharp.dll" Private="false" />
+    <Reference Include="MessagePack" HintPath="$(ManagedDir)\MessagePack.dll" Private="false" />
+    <Reference Include="Rewired_Core" HintPath="$(ManagedDir)\Rewired_Core.dll" Private="false" />
+    <Reference Include="Cinemachine" HintPath="$(ManagedDir)\Cinemachine.dll" Private="false" />
+    <Reference Include="Unity.InputSystem" HintPath="$(ManagedDir)\Unity.InputSystem.dll" Private="false" />
+    <Reference Include="UnityEngine" HintPath="$(ManagedDir)\UnityEngine.dll" Private="false" />
+    <Reference Include="UnityEngine.CoreModule" HintPath="$(ManagedDir)\UnityEngine.CoreModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AnimationModule" HintPath="$(ManagedDir)\UnityEngine.AnimationModule.dll" Private="false" />
+    <Reference Include="UnityEngine.Physics2DModule" HintPath="$(ManagedDir)\UnityEngine.Physics2DModule.dll" Private="false" />
+    <Reference Include="UnityEngine.InputLegacyModule" HintPath="$(ManagedDir)\UnityEngine.InputLegacyModule.dll" Private="false" />
+    <Reference Include="UnityEngine.ScreenCaptureModule" HintPath="$(ManagedDir)\UnityEngine.ScreenCaptureModule.dll" Private="false" />
+    <Reference Include="UnityEngine.AudioModule" HintPath="$(ManagedDir)\UnityEngine.AudioModule.dll" Private="false" />
+    <Reference Include="UnityEngine.IMGUIModule" HintPath="$(ManagedDir)\UnityEngine.IMGUIModule.dll" Private="false" />
+    <Reference Include="UnityEngine.TextRenderingModule" HintPath="$(ManagedDir)\UnityEngine.TextRenderingModule.dll" Private="false" />
+  </ItemGroup>
+
+  <!-- После сборки кладём плагин и LiteNetLib прямо в игру -->
+  <Target Name="DeployToGame" AfterTargets="Build">
+    <MakeDir Directories="$(PluginDir)" />
+    <Copy SourceFiles="$(TargetPath);$(OutDir)LiteNetLib.dll" DestinationFolder="$(PluginDir)" />
+    <Message Importance="high" Text="Deployed $(TargetFileName) + LiteNetLib.dll -> $(PluginDir)" />
+  </Target>
+
+</Project>
