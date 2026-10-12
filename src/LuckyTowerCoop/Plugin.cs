@@ -11,7 +11,7 @@ namespace LuckyTowerCoop
     {
         public const string Guid = "local.luckytower.coop";
         public const string Name = "LuckyTowerCoop";
-        public const string Version = "0.3.5";
+        public const string Version = "0.3.6";
 
         internal static ManualLogSource Log;
         internal static Harmony Harmony;

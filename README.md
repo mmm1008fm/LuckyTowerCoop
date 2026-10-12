@@ -28,6 +28,11 @@ BepInEx-мод для Lucky Tower Ultimate: второй Ванст — на о�
 экрана игры (полный экран) возвращается сам. Параметры игры: `--coop-host`, `--coop-join IP[:порт]`,
 `--coop-window left|right`, `--coop-device auto|keyboard|gamepad|all`, `--coop-devserver`.
 
+### Качество сети
+`pwsh tools\net-quality.ps1` — стенд: имитация плохого канала (профили lan/good/wifi/bad/awful) и таблица метрик
+(задержка ввода, рывки напарника, провалы, поправки). Dev-команды: `net link <профиль>`, `net quality [reset]`,
+`net interp buffer|legacy`. Параметр игры `--coop-link <профиль>`. Настройка «Плавный показ мира у клиента» — в F7.
+
 ### Steam на одном ПК
 Нужны второй аккаунт Steam (в друзьях у основного) и Sandboxie-Plus (`winget install Sandboxie.Plus`).
 Запуск: `Онлайн Steam на одном ПК.cmd`. Слева хост через основной Steam, справа клиент через второй Steam в песочнице «Steam2».
