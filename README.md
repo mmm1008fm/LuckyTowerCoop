@@ -1,145 +1,149 @@
 # LuckyTowerCoop
 
-Кооператив на двоих для **Lucky Tower Ultimate**: второй Ванст на одном ПК или онлайн, через Steam или напрямую по IP.
-Это мод на BepInEx. Файлы игры он не меняет, удаляется одной кнопкой.
+Two-player co-op mod for **Lucky Tower Ultimate**: a second Vanst on the same PC or online, over Steam or by direct IP.
+It is a BepInEx mod. It does not modify game files and uninstalls with one click.
 
-Текущая версия: **0.3.7**. У обоих игроков должна стоять одна и та же версия.
+Current version: **0.3.7**. Both players must run the same version.
 
----
-
-## Для игрока
-
-### Установка
-1. Распакуйте `LuckyTowerCoop_<версия>.zip` в любую папку.
-2. Запустите `Установить.cmd`. Он сам найдёт игру или спросит папку, поставит BepInEx, мод и Steam-модуль. Ваши настройки сохранятся.
-3. Удаление: `Удалить.cmd`.
-
-### Игра онлайн
-Steam должен быть запущен у обоих. Мод подключается через отдельный процесс `CoopNet.exe`, в статусе Steam он виден как «Spacewar».
-
-- **Хост:** в игре нажмите **F7**, затем «Создать игру». Создаётся лобби только для друзей.
-- **Друг:** **F7**, затем «Открыть список друзей (Steam)», затем «Войти» напротив хоста. Можно и по коду лобби или «Напрямую (IP)», порт 27015.
-- Клиенту ничего не нужно делать в меню игры: после подключения он сам загрузит забег хоста.
-- В строке статуса внизу видно пинг, задержку ввода и качество Steam-соединения: потери, очередь, напрямую или через сервер Valve.
-- **Обрыв связи.** У хоста игра встаёт на паузу и появляется окно «Ждать / Играть одному / Закрыть сессию». Персонаж ушедшего падает, его вещи можно забрать. Пока сессия открыта, напарник может вернуться.
-- Сохранения клиента в онлайне не меняются, играется забег хоста.
-
-### Игра на одном ПК
-Второй игрок появляется сам. По умолчанию он играет последним подключённым геймпадом.
-Управление вторым с клавиатуры: в F7 выберите «Настройки», затем «Управление вторым игроком», затем «Клавиатура».
-Тогда второй управляется так: стрелки, K прыжок, J атака, L подобрать, U бросок, I использовать, O поменять руки, P выбросить, 7/8/9 варианты ответа.
-
-### Правила коопа
-- **Двери, проходы и люки открываются голосованием.** Кто вошёл первым, ждёт, над входом горит «1/2». Переход случается, когда войдёт второй. Отменить ожидание: «вниз» или прыжок.
-- **Смерть.** Если напарник жив, забег продолжается. Погибший воскресает, когда живой убьёт нужное число монстров или дойдёт до нового этажа. Умерли оба — конец забега.
-- **Вещи и деньги у каждого свои:** руки, монеты, кошель. В магазинах и автоматах платит тот, кто покупает.
-- **Монеты можно передать напарнику:** F7, вкладка «Игроки», кнопки «Передать 1 / 10 / все».
-- После смерти камера показывает напарника.
-
-### Меню F7
-| Вкладка | Что там |
-|---|---|
-| Онлайн | создать игру, подключиться, пересинхронизация, отключение |
-| Настройки | здоровье врагов и доп. монстры, условия воскрешения, камера, подписи над персонажами, управление вторым, пауза при обрыве, предсказание движения, плавный показ мира |
-| Игроки | состояние обоих, передача монет, «Подтянуть напарника», «Воскресить сейчас», добавить или убрать второго игрока |
-
-В онлайне правила задаёт хост, у клиента они только для чтения.
-
-### Известные ограничения
-Полная таблица по механикам игры лежит в [docs/COVERAGE.md](docs/COVERAGE.md). Главное:
-- Компаньоны следуют за первым игроком.
-- Бутылка возрождения работает только для первого игрока.
-- Молотобоец и ловушки на скрытность целятся в первого игрока.
-- Злой маг Эвелиус разговаривает с одним игроком.
-- Слои глубины на балконе и в лаборатории у обоих общие.
-- Выход из Лимбо через пузырь-дверь в онлайне пока ломает синхронизацию.
-- Ломбард, парикмахер и сантехник вторым игроком вживую не проверены.
-- Реальные геймпады и Steam между двумя разными аккаунтами автотестами не проверены.
-
-### Если что-то пошло не так
-- Мир у клиента разошёлся с хостом: F7, «Онлайн», «Пересинхронизация». Обычно клиент сам замечает расхождение и просит её.
-- Не подключается через Steam: проверьте, что у обоих одна версия мода и вы друзья в Steam.
-- Лог для разбора: `<папка игры>\BepInEx\LogOutput.log`. Строки `[Steam]` описывают качество соединения.
+[Русская версия](README.ru.md)
 
 ---
 
-## Для разработчика
+## For players
 
-### Устройство проекта
-| Путь | Что это |
+### Installation
+1. Extract `LuckyTowerCoop_<version>.zip` anywhere.
+2. Run `Установить.cmd` (Install). It finds the game or asks for its folder, then installs BepInEx, the mod and the Steam module. Your settings are kept.
+3. To uninstall, run `Удалить.cmd` (Uninstall).
+
+### Playing online
+Both players need Steam running. The mod connects through a separate `CoopNet.exe` process, which Steam shows as "Spacewar".
+
+- **Host:** press **F7** in game, then "Create game". A friends-only lobby is created.
+- **Friend:** press **F7**, open the Steam friends list and click "Join" next to the host. You can also join by lobby code or by direct IP on port 27015.
+- The client does not need to do anything in the game menu. After connecting it loads the host's run automatically.
+- The status line at the bottom shows ping, input delay and Steam connection quality: packet loss, queue time, direct or relayed through Valve.
+- **Disconnects.** The host's game pauses with a "Wait / Play alone / Close session" dialog. The partner who left drops dead and their items can be looted. While the session is open, the partner can rejoin.
+- The client's save files are not changed online: the host's run is what you play.
+
+### Playing on one PC
+The second player spawns automatically and uses the most recently connected gamepad by default.
+To control player 2 with the keyboard, open F7, go to Settings and set the player 2 device to keyboard.
+Keyboard layout for player 2: arrows to move, K jump, J attack, L pick up, U throw, I use, O swap hands, P drop, 7/8/9 dialogue options.
+
+### Co-op rules
+- **Doors, passages and hatches work by vote.** Whoever enters first waits and "1/2" appears above the entrance. The transition happens when the second player enters too. Press down or jump to cancel waiting.
+- **Death.** If your partner is alive, the run continues. A dead player revives after the survivor kills enough monsters or reaches a new floor. If both die, the run is over.
+- **Each player has their own items and money:** hands, coins and belt purse. In shops and vending machines, the buyer pays.
+- **Coins can be given to the partner:** F7, Players tab, "Give 1 / 10 / all" buttons.
+- After you die, the camera follows your partner.
+
+### F7 menu
+| Tab | Contents |
 |---|---|
-| `src/LuckyTowerCoop/` | плагин: `Coop/` локальный кооп, `Net/` онлайн, `Patches/` патчи Harmony, `Dev/` отладочный сервер команд |
-| `src/CoopNet/` | Steam-модуль: отдельный процесс на .NET 8 со Steamworks.NET и Spacewar |
-| `tools/` | запуск, тесты, сборка релиза |
-| `docs/` | план, задачи, карта кода, дизайн онлайна, матрица покрытия, отчёты |
-| `decompiled/` | декомпиляция игры, только локально, в git не попадает |
+| Online | create game, join, resync, disconnect |
+| Settings | enemy health and extra monsters, revive conditions, camera, name tags, player 2 device, pause on disconnect, movement prediction, smooth world display |
+| Players | state of both players, coin transfer, "Pull partner to me", "Revive now", add or remove player 2 |
 
-Документы:
-- [docs/PLAN.md](docs/PLAN.md): план и текущее состояние.
-- [docs/TASKS.md](docs/TASKS.md): очередь задач, расписанных для исполнителя.
-- [docs/CODE_MAP.md](docs/CODE_MAP.md): карта классов игры.
-- [docs/ONLINE.md](docs/ONLINE.md): дизайн онлайна.
-- [docs/COVERAGE.md](docs/COVERAGE.md): какие механики работают на двоих.
-- [docs/QUEUE-REPORT.md](docs/QUEUE-REPORT.md): отчёт по последней очереди.
+Online, the host sets the rules. The client sees them read-only.
 
-### Сборка
+### Known limitations
+The full table of game mechanics is in [docs/COVERAGE.md](docs/COVERAGE.md) (in Russian). The main points:
+- Companions follow player 1.
+- The respawn bottle only works for player 1.
+- The hammer guy and stealth traps target player 1.
+- The evil mage Evelius talks to one player only.
+- Depth layers on the balcony and in the lab are shared by both players.
+- Leaving Limbo through the bubble door breaks online sync for now.
+- The pawnshop, barber and pipefitter have not been tested live with player 2.
+- Real gamepads and Steam between two different accounts have not been covered by automated tests.
+
+### Troubleshooting
+- The client's world drifted from the host: F7, Online, "Resync". Usually the client detects the drift and asks for it on its own.
+- Steam does not connect: check that both players have the same mod version and are Steam friends.
+- Log for bug reports: `<game folder>\BepInEx\LogOutput.log`. Lines starting with `[Steam]` describe connection quality.
+
+---
+
+## For developers
+
+Working docs, code comments and in-game UI are in Russian. Commit messages are in English.
+
+### Layout
+| Path | Contents |
+|---|---|
+| `src/LuckyTowerCoop/` | the plugin: `Coop/` local co-op, `Net/` online, `Patches/` Harmony patches, `Dev/` debug command server |
+| `src/CoopNet/` | Steam module: a separate .NET 8 process with Steamworks.NET on Spacewar (AppID 480) |
+| `tools/` | launch, test and release scripts |
+| `docs/` | plan, task queue, code map, online design, coverage matrix, reports |
+| `decompiled/` | decompiled game code, local only, not in git |
+
+Docs:
+- [docs/PLAN.md](docs/PLAN.md): plan and current state.
+- [docs/TASKS.md](docs/TASKS.md): task queue written for an implementer.
+- [docs/CODE_MAP.md](docs/CODE_MAP.md): map of the game's classes.
+- [docs/ONLINE.md](docs/ONLINE.md): online design.
+- [docs/COVERAGE.md](docs/COVERAGE.md): which mechanics work for two players.
+- [docs/QUEUE-REPORT.md](docs/QUEUE-REPORT.md): report on the latest task queue.
+
+### Building
 ```powershell
 dotnet build src\LuckyTowerCoop\LuckyTowerCoop.csproj -c Debug
 ```
-Плагин сам копируется в игру, путь задаёт свойство `GameDir`. Перед сборкой закройте игру, иначе dll занята.
+The plugin is copied into the game automatically. The game path is the `GameDir` property. Close the game before building, otherwise the dll is locked.
 
 ```powershell
 dotnet publish src\CoopNet\CoopNet.csproj -c Release
 ```
-Steam-модуль копируется в `BepInEx\plugins\LuckyTowerCoop\CoopNet\`.
+The Steam module is copied to `BepInEx\plugins\LuckyTowerCoop\CoopNet\`.
 
 ```powershell
 pwsh tools\make-dist.ps1
 ```
-Собирает релиз и архив с установщиком в `dist\`. Номер версии стоит в `Plugin.cs` и `LuckyTowerCoop.csproj`.
+Builds a release and an installer archive in `dist\`. The version number lives in `Plugin.cs` and `LuckyTowerCoop.csproj`.
 
-### Как устроен онлайн
-- **Хост — авторитет, клиент — зеркало.** Всю игру считает хост, у клиента персонажи, враги и предметы повторяют снапшоты. Логика ловушек у клиента выключена.
-- **Персонаж клиента у хоста** — второй игрок, его ввод приходит по сети.
-- **Подмена «текущего игрока».** Код игры обращается к «игроку» как к одному персонажу. На время действий второго игрока мод подставляет его, а врагам подставляет ближайшего игрока.
-- **Плавность.** Клиент показывает мир чуть в прошлом и ведёт его между снапшотами по часам хоста. Свой персонаж предсказывается и сверяется с хостом по номеру нажатия.
-- **Генерация.** Башня у обоих строится по одному сиду, случайные объекты сидируются по пути в иерархии.
+### How online works
+- **The host is authoritative, the client mirrors it.** The host runs the game. On the client, characters, enemies and items replay the host's snapshots, and trap logic is disabled.
+- **The client's character** is player 2 on the host, driven by input sent over the network.
+- **"Current player" swap.** Game code treats "the player" as a single character. While player 2 acts, the mod substitutes player 2. Enemies get the nearest player.
+- **Smoothness.** The client renders the world slightly in the past and interpolates between snapshots using the host's clock. Its own character is predicted and reconciled with the host by input sequence number.
+- **Generation.** Both sides build the tower from the same seed. Random objects are seeded by their path in the hierarchy.
 
-### Тесты и отладка
-Отладочный сервер команд включается параметром игры `--coop-devserver`. Хост слушает порт 47800, клиент 47801.
+### Testing and debugging
+The debug command server is enabled with the `--coop-devserver` game argument. The host listens on port 47800, the client on 47801.
 ```powershell
 . tools\devlib.ps1
 DevA 'where'
 DevB 'net status'
 ```
 
-| Скрипт | Что делает |
+| Script | What it does |
 |---|---|
-| `Онлайн на одном ПК.cmd` / `tools\local-online.ps1` | две копии игры через localhost, слева хост, справа клиент |
-| `tools\route-test.ps1 -Rooms 10` | автотест маршрута по дверям: комнаты, объекты, трупы, ресинхронизации, ошибки |
-| `tools\net-quality.ps1` | стенд качества сети: плохие каналы и таблица задержек и рывков |
-| `Онлайн Steam на одном ПК.cmd` | Steam на одном ПК: второй аккаунт в песочнице Sandboxie-Plus |
-| `tools\soak.ps1` | прогон на износ случайным вводом |
+| `Онлайн на одном ПК.cmd` / `tools\local-online.ps1` | two game instances over localhost, host on the left, client on the right |
+| `tools\route-test.ps1 -Rooms 10` | automated route through doors: rooms, entities, corpses, resyncs, errors |
+| `tools\net-quality.ps1` | network quality bench: emulated bad links and a table of delays and hitches |
+| `Онлайн Steam на одном ПК.cmd` | Steam on one PC: a second account in a Sandboxie-Plus sandbox |
+| `tools\soak.ps1` | soak test with random input |
 
-Полезные dev-команды:
-- **Состояние:** `where`, `doors`, `rooms`, `netents`, `ent <id>`, `ls <путь>`, `log N <фильтр>`. Лог всегда запрашивайте с фильтром.
-- **Управление:** `load tower`, `tp p1 x y`, `tap p1 up`, `walkto p1 x`, `patrol p1 x1 x2 сек`, `killall`, `god`, `unlock`, `free`, `gold p1 N`, `givecoins p1 N`.
-- **Сеть:** `net link wifi|bad|off`, `net quality [reset]`, `net interp buffer|legacy`, `net resync`, `net drop`.
+Useful dev commands:
+- **State:** `where`, `doors`, `rooms`, `netents`, `ent <id>`, `ls <path>`, `log N <filter>`. Always request logs with a filter.
+- **Control:** `load tower`, `tp p1 x y`, `tap p1 up`, `walkto p1 x`, `patrol p1 x1 x2 sec`, `killall`, `god`, `unlock`, `free`, `gold p1 N`, `givecoins p1 N`.
+- **Network:** `net link wifi|bad|off`, `net quality [reset]`, `net interp buffer|legacy`, `net resync`, `net drop`.
 
-Параметры запуска игры:
-- `--coop-host`, `--coop-join IP[:порт]`, `--coop-steam-host`, `--coop-steam-join [лобби]` — сразу создать игру или подключиться.
-- `--coop-window left|right`, `--coop-device auto|keyboard|gamepad|all` — окно и устройство управления.
-- `--coop-devserver`, `--coop-link <профиль>` — отладочный сервер и имитация канала.
+Game launch arguments:
+- `--coop-host`, `--coop-join IP[:port]`, `--coop-steam-host`, `--coop-steam-join [lobby]`: create or join a game right away.
+- `--coop-window left|right`, `--coop-device auto|keyboard|gamepad|all`: window placement and input device.
+- `--coop-devserver`, `--coop-link <profile>`: debug server and link emulation.
 
 ### Git
-- Основная ветка `main`, релизы помечены метками `vX.Y.Z`.
-- Работа идёт в отдельных ветках, по коммиту на задачу.
-- После каждой задачи нужен чистый `route-test`.
+- The main branch is `main`. Releases are tagged `vX.Y.Z`.
+- Work happens in separate branches, one commit per task.
+- Every task must end with a clean `route-test`.
 
-### Конфиг
-Файл `<игра>\BepInEx\config\local.luckytower.coop.cfg`. Почти всё меняется и в меню F7.
+### Config
+File: `<game>\BepInEx\config\local.luckytower.coop.cfg`. Almost everything can also be changed in the F7 menu.
 
-| Секция | Ключи |
+| Section | Keys |
 |---|---|
 | General | Enabled, ShowNames |
 | Difficulty | EnemyHealthMultiplier, ExtraEnemies |

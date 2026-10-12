@@ -29,15 +29,7 @@
   случайности сидируются списком в `Patches/RandomizerPatches.cs`, объекты регистрируются в `Net/NetHost.cs` (`WorldObjects`).
   Пути объектов: `Net/NetEntities.cs` → `NetPaths` (разделители — служебные символы, для логов `NetPaths.Pretty`).
 
-## 1. Релиз 0.3.4 на Google Диск
-Версия уже 0.3.4 в `src/LuckyTowerCoop/Plugin.cs` и `.csproj`.
-1. Закрыть копии игры. `pwsh D:\game\LuckyTowerCoop\tools\make-dist.ps1` → печатает `dist: D:\game\LuckyTowerCoop\dist\LuckyTowerCoop_0.3.4.0.zip`.
-2. Если диск `G:\My Drive` доступен: скопировать `D:\game\Lucky.Tower.Ultimate.v1.1.4\BepInEx\plugins\LuckyTowerCoop\*` поверх
-   `G:\My Drive\Lucky.Tower.Ultimate.v1.1.4\BepInEx\plugins\LuckyTowerCoop\`, zip — в корень `G:\My Drive\`; старый `LuckyTowerCoop_0.3.3.0.zip`
-   переименовать в `..._старая.zip` (Remove-Item на G: блокируется — только Rename-Item).
-3. Проверка: `(Get-Item 'G:\My Drive\...\LuckyTowerCoop.dll').VersionInfo.FileVersion` = 0.3.4.0, хэши dll/zip совпадают с исходниками
-   (`Get-FileHash`), выгрузка завершена (скрипт `drive_status.py` в scratchpad сессии или статус Drive for desktop).
-Готово: dll 0.3.4 и zip на Диске, старый zip переименован.
+## 1. ~~Релиз 0.3.4~~ — сделано. Релиз: pwsh tools\make-dist.ps1, архив в dist\.
 
 ## 2. Обломки «leftover» и объекты, упавшие за карту
 Симптом: в пещерах/комнате `Dead` у клиента `not found here: PlantRemains/ArmorLeftOvers/leftover ...`; объект `leftover` с y ≈ −90000 падает вечно.
