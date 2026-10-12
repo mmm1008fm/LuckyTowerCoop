@@ -59,6 +59,8 @@ namespace LuckyTowerCoop.Net
         Window = 27,
         /// <summary>Клиент → хост: просьба начать забег заново / вернуться в деревню (хост решает).</summary>
         RestartRequest = 28,
+        /// <summary>Клиент → хост: передать напарнику N монет своего персонажа (меняет только хост).</summary>
+        GiveCoins = 29,
 
         Input = 30,
     }

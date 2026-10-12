@@ -1,4 +1,5 @@
 using LuckyTower;
+using LuckyTowerCoop.Net;
 using LuckyTower.Items;
 using LuckyTowerCoop.Patches;
 using GamePlayer = LuckyTower.CharacterSystem.Player;
@@ -124,6 +125,37 @@ namespace LuckyTowerCoop.Coop
                 Add(from, removed - added); // не влезло — вернуть
             }
             return added;
+        }
+
+
+        /// <summary>Место первого/второго персонажа в меню: у клиента его собственный (P1) — место B.</summary>
+        public static Seat SeatOf(bool first) => NetSession.IsClient ? (first ? Seat.B : Seat.A) : (first ? CoopPlayers.MainSeat : CoopPlayers.SecondSeat);
+
+        /// <summary>Сколько монет у места по последнему слову хоста (на клиенте персонажи — марионетки без кошелей).</summary>
+        public static readonly int[] SeatTotals = new int[2];
+
+        /// <summary>Монеты персонажа места: на клиенте — присланные хостом, иначе считаются по кошелям.</summary>
+        public static int TotalOf(GamePlayer p, Seat seat) => NetSession.IsClient ? SeatTotals[(int)seat] : Count(p);
+
+        /// <summary>
+        /// Передать напарнику монеты «моего» персонажа. Хост / локальная игра — сразу; клиент — просьба хосту (меняет только хост).
+        /// Возвращает переданное (для клиента всегда 0: ответ — в числах монет в следующем PlayerState).
+        /// </summary>
+        public static int GiveToPartner(GamePlayer mine, int amount)
+        {
+            if (amount <= 0)
+            {
+                return 0;
+            }
+            if (NetSession.IsClient)
+            {
+                NetSession.Instance?.Client?.RequestGiveCoins(amount);
+                return 0;
+            }
+            var other = mine == CoopPlayers.P1 ? CoopPlayers.P2 : CoopPlayers.P1;
+            int n = Transfer(mine, other, amount);
+            Plugin.Log.LogInfo($"[Coop] coins: {mine?.name} -> {other?.name}: asked {amount}, moved {n}");
+            return n;
         }
 
         private static GoldSack NewEmptySack()

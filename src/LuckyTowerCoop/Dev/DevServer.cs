@@ -915,8 +915,24 @@ namespace LuckyTowerCoop.Dev
                     {
                         return "no such player";
                     }
-                    int total = args.Length > 2 ? CoopGold.Set(who, int.Parse(args[2])) : CoopGold.Count(who);
+                    int total = args.Length > 2 ? CoopGold.Set(who, int.Parse(args[2])) : CoopGold.TotalOf(who, CoopGold.SeatOf(args[1] != "p2"));
                     return $"{args[1]} gold={total}";
+                }
+
+                case "givecoins":
+                {
+                    // givecoins p1|p2 N — передать напарнику N монет (как кнопка меню; у клиента — просьба хосту)
+                    if (args.Length < 3)
+                    {
+                        return "usage: givecoins p1|p2 N";
+                    }
+                    var who = args[1] == "p2" ? (GamePlayer)CoopPlayers.P2 : CoopPlayers.P1;
+                    if (who == null)
+                    {
+                        return "no such player";
+                    }
+                    int moved = CoopGold.GiveToPartner(who, int.Parse(args[2]));
+                    return $"asked {args[2]}, moved {moved} (client: request sent)";
                 }
 
                 case "hands":

@@ -77,8 +77,10 @@ namespace LuckyTowerCoop.Coop
         {
             bool client = NetSession.IsClient;
             Header("Персонажи");
-            DrawPlayerLine(CoopPlayers.P1, NetSession.Role == NetRole.None ? "Игрок 1" : "Вы");
-            DrawPlayerLine(CoopPlayers.P2, NetSession.Role == NetRole.None ? "Игрок 2" : Partner());
+            DrawPlayerLine(CoopPlayers.P1, NetSession.Role == NetRole.None ? "Игрок 1" : "Вы", CoopGold.SeatOf(true));
+            DrawPlayerLine(CoopPlayers.P2, NetSession.Role == NetRole.None ? "Игрок 2" : Partner(), CoopGold.SeatOf(false));
+
+            DrawCoins();
 
             if (client)
             {
@@ -122,13 +124,56 @@ namespace LuckyTowerCoop.Coop
             }
         }
 
+        private static void DrawCoins()
+        {
+            Header("Монеты");
+            bool online = NetSession.Role != NetRole.None;
+            var p1 = CoopPlayers.P1;
+            var p2 = CoopPlayers.P2;
+            bool both = p1 != null && p2 != null;
+            if (!both)
+            {
+                Note("Передать монеты можно, когда в игре двое.");
+                return;
+            }
+            // онлайн — только свой персонаж (главный: у хоста P1, у клиента его собственный); локально — каждый другому
+            DrawGiveRow(online ? "Вы" : "Игрок 1", p1, CoopGold.SeatOf(true));
+            if (!online)
+            {
+                DrawGiveRow("Игрок 2", p2, CoopGold.SeatOf(false));
+            }
+        }
+
+        private static void DrawGiveRow(string who, GamePlayer mine, Seat seat)
+        {
+            int have = CoopGold.TotalOf(mine, seat);
+            bool enabled = GUI.enabled;
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"{who}: {have}", GUILayout.Width(110));
+            GUI.enabled = enabled && have > 0 && !mine.Stats.Dead;
+            if (GUILayout.Button("Передать 1", GUILayout.Width(110)))
+            {
+                CoopGold.GiveToPartner(mine, 1);
+            }
+            if (GUILayout.Button("Передать 10", GUILayout.Width(110)))
+            {
+                CoopGold.GiveToPartner(mine, 10);
+            }
+            if (GUILayout.Button("Передать все", GUILayout.Width(110)))
+            {
+                CoopGold.GiveToPartner(mine, 1000);
+            }
+            GUI.enabled = enabled;
+            GUILayout.EndHorizontal();
+        }
+
         private static string Partner()
         {
             string name = NetSession.Instance != null ? NetSession.Instance.PeerName : null;
             return string.IsNullOrEmpty(name) ? "Напарник" : name;
         }
 
-        private static void DrawPlayerLine(GamePlayer p, string who)
+        private static void DrawPlayerLine(GamePlayer p, string who, Seat seat)
         {
             if (p == null)
             {
@@ -137,7 +182,7 @@ namespace LuckyTowerCoop.Coop
             }
             var s = p.Stats;
             string hands = (s.HasWeapon ? s.WeaponItem.ItemName : "пусто") + (s.ItemInSecondHand != null ? " + " + s.ItemInSecondHand.ItemName : "");
-            GUILayout.Label($"{who}: {(s.Dead ? "погиб" : "жив")} · в руках: {hands} · золото: {s.CurrentGoldCount()}");
+            GUILayout.Label($"{who}: {(s.Dead ? "погиб" : "жив")} · в руках: {hands} · золото: {CoopGold.TotalOf(p, seat)}");
         }
 
         // ---------------- элементы ----------------

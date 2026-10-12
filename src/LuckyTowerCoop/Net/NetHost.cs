@@ -160,6 +160,15 @@ namespace LuckyTowerCoop.Net
                     RestartAskedAt = Time.unscaledTime;
                     Plugin.Log.LogInfo("[NetHost] client asks to restart the run");
                     break;
+                case Msg.GiveCoins:
+                {
+                    int ask = r.GetInt();
+                    var from = SeatChar(Seat.B);
+                    var to = SeatChar(Seat.A);
+                    int moved = CoopGold.Transfer(from, to, Mathf.Clamp(ask, 0, 1000));
+                    Plugin.Log.LogInfo($"[NetHost] client gives coins: asked {ask}, moved {moved}");
+                    break;
+                }
                 case Msg.ResyncRequest:
                     string reason = r.GetString();
                     Plugin.Log.LogInfo($"[NetHost] client asks resync: {reason}");
@@ -874,7 +883,8 @@ namespace LuckyTowerCoop.Net
                 var teeth = s?.TeethInventory;
                 string teethKey = teeth == null ? "" : string.Join(",", teeth.Select(t => $"{(int)t.Color}:{t.Position}:{t.CurrentHits}"));
                 int form = c != null ? (int)c.CharacterName : 0;
-                string key = $"{tag}|{dead}|{armor}|{helmet}|{sack}|{gold}|{teethKey}|{form}";
+                int total = s != null ? s.CurrentGoldCount() : 0;
+                string key = $"{tag}|{dead}|{armor}|{helmet}|{sack}|{gold}|{teethKey}|{form}|{total}";
                 if (!force && key == m_seatState[i])
                 {
                     continue;
@@ -909,6 +919,7 @@ namespace LuckyTowerCoop.Net
                     w.Put((byte)Mathf.Clamp(teeth[t].CurrentHits, 0, 255));
                 }
                 w.Put((byte)form); // форма тела (Wanst/Monster/Evelius…): клиент создаёт марионетку из того же префаба
+                w.Put(total);
                 m_s.Send(w, Delivery.Reliable);
             }
         }

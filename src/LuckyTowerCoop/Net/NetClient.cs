@@ -63,6 +63,15 @@ namespace LuckyTowerCoop.Net
             Plugin.Log.LogInfo("[NetClient] restart requested from host");
         }
 
+        /// <summary>Просьба хосту: передать напарнику (хосту) N монет моего персонажа.</summary>
+        public void RequestGiveCoins(int amount)
+        {
+            var w = m_s.Begin(Msg.GiveCoins);
+            w.Put(amount);
+            m_s.Send(w, Delivery.Reliable);
+            Plugin.Log.LogInfo($"[NetClient] give coins requested: {amount}");
+        }
+
         /// <summary>Когда клиент последний раз просил рестарт (для подсказки на экране).</summary>
         public float RestartRequestedAt { get; private set; } = -100f;
 
@@ -1447,6 +1456,7 @@ namespace LuckyTowerCoop.Net
             }
             var form = (LocaDatabase.Characters)r.GetByte();
             int i = (int)seat;
+            CoopGold.SeatTotals[i] = r.GetInt();
 
             var puppet = SeatPuppet(seat);
             // у хоста персонаж этого места сменился (воскрешение, возвращение после обрыва):
