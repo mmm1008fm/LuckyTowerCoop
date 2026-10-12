@@ -526,6 +526,22 @@ namespace LuckyTowerCoop.Net
         private static readonly List<GameObject> s_world = new List<GameObject>(256);
         private static readonly HashSet<GameObject> s_worldSeen = new HashSet<GameObject>();
 
+        private static bool IsLeftover(GameObject go)
+        {
+            if (go.name.StartsWith("leftover", System.StringComparison.OrdinalIgnoreCase) || go.name.EndsWith("LeftOvers", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+            for (var t = go.transform.parent; t != null; t = t.parent)
+            {
+                if (t.name == "PlantRemains" || t.name.EndsWith("LeftOvers", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
         /// <summary>Объекты комнаты, у которых есть своя жизнь (аниматор, физика, ловушка, рычаг, сундук, повреждаемое) — кроме персонажей и предметов.</summary>
         private static List<GameObject> WorldObjects(Room room)
         {
@@ -552,6 +568,11 @@ namespace LuckyTowerCoop.Net
                 {
                     return;
                 }
+                // обломки брони / остатки растений (косметика, падают за карту и не находятся у клиента)
+                if (IsLeftover(go))
+                {
+                    return;
+                }
                 s_world.Add(go);
             }
             foreach (var a in room.GetComponentsInChildren<Animator>(true)) { Add(a); }
@@ -565,9 +586,9 @@ namespace LuckyTowerCoop.Net
 
         private void Register(GameObject go, EntityKind kind, Transform roomT, List<NetEntity> added)
         {
-            if (m_byGo.ContainsKey(go))
+            if (m_byGo.ContainsKey(go) || (kind != EntityKind.Character && IsLeftover(go)))
             {
-                return;
+                return; // обломки брони/сундука/бочки — косметика: падают за карту и не находятся у клиента
             }
             // лишний монстр (сложность): у клиента его нет — клиент копирует свою марионетку-источник
             if (CoopDifficulty.TryGetCloneSource(go, out var source))

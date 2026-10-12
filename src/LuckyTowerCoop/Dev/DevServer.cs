@@ -220,6 +220,34 @@ namespace LuckyTowerCoop.Dev
                     return path;
                 }
 
+                case "find":
+                {
+                    // find <подстрока имени> — объекты сцены (включая неактивные): путь, позиция, активность (до 25)
+                    if (args.Length < 2)
+                    {
+                        return "usage: find <name part>";
+                    }
+                    var sbf = new StringBuilder();
+                    int cnt = 0;
+                    foreach (var t in UnityEngine.Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                    {
+                        if (t.name.IndexOf(args[1], StringComparison.OrdinalIgnoreCase) < 0)
+                        {
+                            continue;
+                        }
+                        if (cnt++ < 25)
+                        {
+                            var path = new StringBuilder(t.name);
+                            for (var p = t.parent; p != null; p = p.parent)
+                            {
+                                path.Insert(0, p.name + "/");
+                            }
+                            sbf.AppendLine($"{path} pos={t.position} active={t.gameObject.activeInHierarchy} rb={t.GetComponent<Rigidbody2D>() != null} anim={t.GetComponent<Animator>() != null}");
+                        }
+                    }
+                    return $"{cnt} found\n{sbf}";
+                }
+
                 case "seed":
                     // seed N — зафиксировать сид забега (хост/локально) до `load tower`; seed 0 — снова случайный
                     DevSeedPatch.Forced = args.Length > 1 ? int.Parse(args[1]) : 0;
