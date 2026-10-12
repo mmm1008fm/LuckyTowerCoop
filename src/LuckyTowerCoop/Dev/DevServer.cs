@@ -186,6 +186,42 @@ namespace LuckyTowerCoop.Dev
             }
         }
 
+        private static string PathName(Transform t)
+        {
+            var sb = new StringBuilder(t.name);
+            for (var p = t.parent; p != null; p = p.parent)
+            {
+                sb.Insert(0, p.name + "/");
+            }
+            return sb.ToString();
+        }
+
+        private System.Collections.IEnumerator GenAllRoutine()
+        {
+            var sm = SegmentManager.Instance;
+            var gmm = GameManager.InstanceNoWarnings;
+            if (sm == null || gmm == null)
+            {
+                yield break;
+            }
+            for (int seg = 2; seg <= (int)SegmentManager.TowerSegment.CaveOne; seg++)
+            {
+                if (gmm.Player != null)
+                {
+                    gmm.Player.Stats.SegmentID = seg - 1;
+                }
+                bool done = false;
+                sm.CreateNextSegment((SegmentManager.TowerSegment)seg, () => done = true);
+                float until = Time.realtimeSinceStartup + 30f;
+                while (!done && Time.realtimeSinceStartup < until)
+                {
+                    yield return null;
+                }
+                Plugin.Log.LogInfo($"[Dev] gencaves: segment {(SegmentManager.TowerSegment)seg} done={done}");
+            }
+            Plugin.Log.LogInfo("[Dev] gencaves done");
+        }
+
         private string Execute(string line)
         {
             var args = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
@@ -255,6 +291,51 @@ namespace LuckyTowerCoop.Dev
                     var dk = dummy.AddComponent<LuckyTower.Traps.TrapPowderKeg>();
                     dk.DestroyTower();
                     return "dummy TrapPowderKeg.DestroyTower()";
+                }
+
+                case "gencaves":
+                {
+                    // gencaves — создать подряд сегменты 2…пещеры без захода в комнаты (одинаково на хосте и клиенте), для сверки генерации
+                    StartCoroutine(GenAllRoutine());
+                    return "generating segments 2..CaveOne (see log: [Dev] gencaves done)";
+                }
+
+                case "cavehash":
+                {
+                    // cavehash [файл] — отпечаток пещер: комнаты (имя, тип, сегмент) и дочерние элементы уровня; полный список — в файл
+                    var sbc = new StringBuilder();
+                    var roomsC = new System.Collections.Generic.List<LuckyTower.RoomGeneration.Room>();
+                    foreach (var r in UnityEngine.Object.FindObjectsByType<LuckyTower.RoomGeneration.Room>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                    {
+                        if (r.transform.parent != null && r.transform.parent.parent != null && r.transform.parent.parent.name == "CAVE" || r.transform.parent != null && r.transform.parent.name == "CAVE")
+                        {
+                            roomsC.Add(r);
+                        }
+                    }
+                    roomsC.Sort((a, b) => string.CompareOrdinal(PathName(a.transform), PathName(b.transform)));
+                    foreach (var r in roomsC)
+                    {
+                        sbc.Append(PathName(r.transform)).Append(" [").Append(r.RoomType).Append("] seg=").Append(r.SegmentID).Append(" :");
+                        var le = r.transform.Find("LevelElements");
+                        if (le != null)
+                        {
+                            for (int i = 0; i < le.childCount; i++)
+                            {
+                                sbc.Append(' ').Append(le.GetChild(i).name).Append('(').Append(le.GetChild(i).childCount).Append(')');
+                            }
+                        }
+                        sbc.AppendLine();
+                    }
+                    uint h = 2166136261;
+                    foreach (char ch in sbc.ToString())
+                    {
+                        h = (h ^ ch) * 16777619;
+                    }
+                    string file = args.Length > 1 ? args[1] : "cave";
+                    string dirc = Path.Combine(BepInEx.Paths.BepInExRootPath, "shots");
+                    Directory.CreateDirectory(dirc);
+                    File.WriteAllText(Path.Combine(dirc, file + ".txt"), sbc.ToString());
+                    return $"cave rooms={roomsC.Count} hash={h:X8} file={file}.txt";
                 }
 
                 case "find":

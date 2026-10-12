@@ -528,7 +528,8 @@ namespace LuckyTowerCoop.Net
 
         private static bool IsLeftover(GameObject go)
         {
-            if (go.name.StartsWith("leftover", System.StringComparison.OrdinalIgnoreCase) || go.name.EndsWith("LeftOvers", System.StringComparison.OrdinalIgnoreCase))
+            if (go.name.StartsWith("leftover", System.StringComparison.OrdinalIgnoreCase) || go.name.EndsWith("LeftOvers", System.StringComparison.OrdinalIgnoreCase)
+                || go.name.IndexOf("ArmorDestroyed", System.StringComparison.OrdinalIgnoreCase) >= 0)
             {
                 return true;
             }

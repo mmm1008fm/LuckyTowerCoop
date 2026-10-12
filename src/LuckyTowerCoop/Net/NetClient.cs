@@ -779,7 +779,7 @@ namespace LuckyTowerCoop.Net
                 m_pendingRoom = p;
                 return;
             }
-            var room = FindRoom(p.Name);
+            var room = FindRoom(p.Name, p.Segment);
             if (room == null)
             {
                 m_pendingRoom = p;
@@ -856,16 +856,29 @@ namespace LuckyTowerCoop.Net
             return t.gameObject;
         }
 
-        private static Room FindRoom(string name)
+        /// <summary>
+        /// Комната по имени. Имена в пещерах повторяются между кластерами («Cave 6» ×3) — тогда выбираем по номеру сегмента хоста
+        /// (иначе клиент вставал в комнату другого кластера: «Cave» хост=32 объекта, клиент=15).
+        /// </summary>
+        private static Room FindRoom(string name, int segment = int.MinValue)
         {
+            Room first = null;
             foreach (var room in Object.FindObjectsByType<Room>(FindObjectsInactive.Include, FindObjectsSortMode.None))
             {
-                if (room.name == name)
+                if (room.name != name)
+                {
+                    continue;
+                }
+                if (segment == int.MinValue || room.SegmentID == segment)
                 {
                     return room;
                 }
+                if (first == null)
+                {
+                    first = room;
+                }
             }
-            return null;
+            return first;
         }
 
         /// <summary>Подключение посреди забега: догенерировать сегменты до комнаты хоста (тот же сид).</summary>
@@ -875,12 +888,17 @@ namespace LuckyTowerCoop.Net
             var sm = SegmentManager.Instance;
             for (int seg = 1; seg <= targetSegment && sm != null && m_pendingRoom != null; seg++)
             {
-                if (FindRoom(m_pendingRoom.Name) != null)
+                if (FindRoom(m_pendingRoom.Name, m_pendingRoom.Segment) != null)
                 {
                     break;
                 }
                 bool done = false;
                 Plugin.Log.LogInfo($"[NetClient] generating segment {seg} to reach {m_pendingRoom.Name}");
+                // у хоста сегмент N создаётся, когда игрок входит в выходную комнату сегмента N−1 (SegmentID = N−1)
+                if (seg >= 2)
+                {
+                    SyncPlayerSegment(GameManager.InstanceNoWarnings, seg - 1);
+                }
                 sm.CreateNextSegment((SegmentManager.TowerSegment)seg, () => done = true);
                 float t = 0f;
                 while (!done && t < 15f)
@@ -892,7 +910,7 @@ namespace LuckyTowerCoop.Net
             m_ensuringSegments = false;
             if (m_pendingRoom != null)
             {
-                var room = FindRoom(m_pendingRoom.Name);
+                var room = FindRoom(m_pendingRoom.Name, m_pendingRoom.Segment);
                 if (room != null)
                 {
                     ApplyRoom(room, m_pendingRoom);
@@ -905,7 +923,22 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        private static readonly Func<Room, int> s_depthLayers = AccessTools.MethodDelegate<Func<Room, int>>(AccessTools.PropertyGetter(typeof(Room), "DepthLayers"));
+        /// <summary>
+        /// Генерация сегмента читает Player.Stats.SegmentID (имена комнат «S0N_…», тип пола, списки комнат для телепорта),
+        /// а игра выставляет его только при проходе через дверь. Клиент входит в комнаты по сообщению хоста — без этого его
+        /// значение отставало, и сегмент 3 получал другие имена комнат («S02_…» вместо «S03_…» → «комната не найдена»).
+        /// </summary>
+        private static void SyncPlayerSegment(GameManager gm, int segmentId)
+        {
+            var player = gm != null ? gm.Player : null;
+            if (player != null && player.Stats != null && player.Stats.SegmentID != segmentId)
+            {
+                Plugin.Log.LogInfo($"[NetClient] player segment {player.Stats.SegmentID} -> {segmentId}");
+                player.Stats.SegmentID = segmentId;
+            }
+        }
+
+        private static readonly Func<Room, int> s_depthLayers =AccessTools.MethodDelegate<Func<Room, int>>(AccessTools.PropertyGetter(typeof(Room), "DepthLayers"));
 
         private void ApplyRoom(Room room, PendingRoom p)
         {
@@ -916,6 +949,7 @@ namespace LuckyTowerCoop.Net
                 return;
             }
             m_eveliusCheckAt = Time.unscaledTime + 3f;
+            SyncPlayerSegment(gm, room.SegmentID);
             if (gm.CurrentRoom != room)
             {
                 try
@@ -1743,7 +1777,7 @@ namespace LuckyTowerCoop.Net
             if (connected && !m_awaitingScene && CoopPlayers.IsInitialized(gm) && m_pendingRoom != null && !m_ensuringSegments)
             {
                 var pending = m_pendingRoom;
-                var room = FindRoom(pending.Name);
+                var room = FindRoom(pending.Name, pending.Segment);
                 if (room != null)
                 {
                     m_pendingRoom = null;

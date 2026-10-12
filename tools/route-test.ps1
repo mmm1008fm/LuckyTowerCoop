@@ -1,6 +1,6 @@
 ﻿# Автотест маршрута: хост и клиент вместе проходят N дверей (голосование у двери), после каждого перехода —
 # сверка комнат, числа объектов, ненайденных у клиента, ресинхронизаций и ошибок.
-param([int]$Rooms = 6, [switch]$NoLaunch, [string]$Until = '')
+param([int]$Rooms = 6, [switch]$NoLaunch, [string]$Until = '', [switch]$AvoidBalcony)
 $t = $PSScriptRoot
 . "$t\devlib.ps1"
 
@@ -28,7 +28,8 @@ $bad = @{}
 for ($n = 1; $n -le $Rooms; $n++) {
     $room = Get-Room (DevA where)
     $seen[$room] = 1
-    $allDoors = @(Doors | Where-Object { $_.Target -ne 'None' -and $_.Target -ne $room -and -not $bad.ContainsKey("$room|$($_.Name)") })
+    $balcRooms = if ($AvoidBalcony) { @(((DevA rooms) -split "`n") | Where-Object { $_ -match '\[(BalconyEntrance|Balcony|BalconyExit)\]' } | ForEach-Object { ($_ -split ' \[')[0] }) } else { @() }
+    $allDoors = @(Doors | Where-Object { $_.Target -ne 'None' -and $_.Target -ne $room -and -not $bad.ContainsKey("$room|$($_.Name)") -and -not ($AvoidBalcony -and $balcRooms -contains $_.Target) })
     $allExits = @(((DevA exits) -split "`n") | ForEach-Object { $m = [regex]::Match($_, '^(Side|Hatch) (.+?) center=\(([-\d.]+), ([-\d.]+)\) target=(\S+)'); if ($m.Success) { [pscustomobject]@{ Kind = $m.Groups[1].Value; Name = $m.Groups[2].Value; X = [double]$m.Groups[3].Value; Y = [double]$m.Groups[4].Value; Target = $m.Groups[5].Value } } })
     # сначала — куда ещё не ходили; иначе назад
     # особые комнаты («S02_F03_R01: Crusher Room») — тупики с запертым входом; идём туда только если больше некуда
