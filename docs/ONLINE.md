@@ -32,7 +32,7 @@ Why a separate process: within one process the Steam API works under a single Ap
 ## Session and connection loss
 - `Hello(protocol version, name, token)` → `Welcome(session token, run seed)`. A version mismatch is rejected.
 - Heartbeat 2 Hz, timeout 6 s.
-- **Client connection loss**: the host pauses the game (`PauseOnDisconnect`) and shows a window "Wait / Play solo / Close session". The client's character dies (items can be picked up). The client reconnects by itself with the same token (or anew after restarting the game), the host does a full resync (scene → seat states → room → entities), and the character spawns anew without items.
+- **Client connection loss**: the host pauses the game (`PauseOnDisconnect`) and shows a window "Wait (pause) / Play solo". The client's character dies (items can be picked up). The client reconnects by itself with the same token (or anew after restarting the game), the host does a full resync (scene → seat states → room → entities), and the character spawns anew without items.
 - **Host connection loss**: the client freezes with a message and keeps reconnecting; the run lives on the host as long as its game is open.
 
 ## Synchronization

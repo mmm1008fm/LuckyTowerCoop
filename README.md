@@ -19,11 +19,11 @@ Current version: **0.3.7**. Both players must run the same version.
 ### Playing online
 Both players need Steam running. The mod connects through a separate `CoopNet.exe` process, which Steam shows as "Spacewar".
 
-- **Host:** press **F7** in game, then "Create game". A friends-only lobby is created.
+- **Host:** press **F7** in game, then "Host a game". A friends-only lobby is created.
 - **Friend:** press **F7**, open the Steam friends list and click "Join" next to the host. You can also join by lobby code or by direct IP on port 27015.
 - The client does not need to do anything in the game menu. After connecting it loads the host's run automatically.
 - The status line at the bottom shows ping, input delay and Steam connection quality: packet loss, queue time, direct or relayed through Valve.
-- **Disconnects.** The host's game pauses with a "Wait / Play alone / Close session" dialog. The partner who left drops dead and their items can be looted. While the session is open, the partner can rejoin.
+- **Disconnects.** The host's game pauses with a "Wait (pause) / Play solo" dialog. The partner who left drops dead and their items can be looted. While the session is open, the partner can rejoin.
 - The client's save files are not changed online: the host's run is what you play.
 
 ### Playing on one PC

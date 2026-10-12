@@ -29,7 +29,7 @@ Install: unpack the archive anywhere and run "Install.cmd".
 It finds the game by itself (or asks for the folder), installs/updates the mod and keeps your settings.
 Uninstall: "Uninstall.cmd" (game files are not modified).
 
-In game: F7 opens the online menu. Host: "Create game". Friend: "Open friends list (Steam)" -> "Join".
+In game: F7 opens the online menu. Host: "Host a game". Friend: "Open friends list (Steam)" -> "Join".
 Both players need Steam running. Both must have the same mod version.
 "@ | Set-Content "$stage\README.txt" -Encoding utf8
 
