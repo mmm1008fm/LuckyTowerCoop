@@ -9,6 +9,7 @@ param(
     [int]$Seconds = 12,
     [switch]$NoLaunch
 )
+$Profiles = @($Profiles | ForEach-Object { $_ -split ',' }); $Modes = @($Modes | ForEach-Object { $_ -split ',' })
 $t = $PSScriptRoot
 . "$t\devlib.ps1"
 $inv = [Globalization.CultureInfo]::InvariantCulture
