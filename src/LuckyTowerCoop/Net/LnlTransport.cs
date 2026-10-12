@@ -6,7 +6,7 @@ using LiteNetLib;
 
 namespace LuckyTowerCoop.Net
 {
-    /// <summary>Прямое UDP-соединение на LiteNetLib: хост слушает порт, клиент подключается по IP.</summary>
+    /// <summary>Direct UDP connection over LiteNetLib: the host listens on a port, the client connects by IP.</summary>
     public sealed class LnlTransport : INetTransport
     {
         private readonly EventBasedNetListener m_listener = new EventBasedNetListener();
@@ -34,7 +34,7 @@ namespace LuckyTowerCoop.Net
                 UnsyncedEvents = false,
                 AutoRecycle = true,
                 IPv6Enabled = false,
-                UpdateTime = 1, // поток отправки: по умолчанию 15 мс
+                UpdateTime = 1, // send thread: 15 ms by default
             };
 
             m_listener.ConnectionRequestEvent += request =>
@@ -49,7 +49,7 @@ namespace LuckyTowerCoop.Net
             m_listener.PeerConnectedEvent += peer =>
             {
                 m_peer = peer;
-                m_status = $"соединено с {peer.Address}:{peer.Port}";
+                m_status = $"connected to {peer.Address}:{peer.Port}";
                 Connected?.Invoke();
             };
             m_listener.PeerDisconnectedEvent += (peer, info) =>
@@ -59,18 +59,18 @@ namespace LuckyTowerCoop.Net
                     return;
                 }
                 m_peer = null;
-                m_status = $"разрыв: {info.Reason}";
+                m_status = $"disconnected: {info.Reason}";
                 Disconnected?.Invoke(info.Reason.ToString());
             };
             m_listener.NetworkReceiveEvent += (peer, reader, channel, method) =>
             {
                 if (m_sim.Intercept(reader.RawData, reader.Position, reader.AvailableBytes, method == DeliveryMethod.ReliableOrdered))
                 {
-                    return; // сетевая лаборатория: пакет придёт позже (или потеряется)
+                    return; // network lab: the packet will arrive later (or be lost)
                 }
                 Received?.Invoke(reader.RawData, reader.Position, reader.AvailableBytes);
             };
-            m_listener.NetworkErrorEvent += (endPoint, error) => m_status = $"ошибка сети: {error}";
+            m_listener.NetworkErrorEvent += (endPoint, error) => m_status = $"network error: {error}";
         }
 
         public static LnlTransport Host(int port)
@@ -79,9 +79,9 @@ namespace LuckyTowerCoop.Net
             if (!t.m_manager.Start(port))
             {
                 t.Dispose();
-                throw new InvalidOperationException($"порт {port} занят");
+                throw new InvalidOperationException($"port {port} is in use");
             }
-            t.m_status = $"ожидание подключения на порту {port}";
+            t.m_status = $"waiting for a connection on port {port}";
             return t;
         }
 
@@ -89,7 +89,7 @@ namespace LuckyTowerCoop.Net
         {
             var t = new LnlTransport(false);
             t.m_manager.Start();
-            t.m_status = $"подключение к {address}:{port}…";
+            t.m_status = $"connecting to {address}:{port}...";
             t.m_manager.Connect(address, port, NetConst.ConnectKey);
             return t;
         }
@@ -100,11 +100,11 @@ namespace LuckyTowerCoop.Net
             m_sim.Pump(m_deliver ??= (d, o, l) => Received?.Invoke(d, o, l));
         }
 
-        // --- сетевая лаборатория (NetLinkSim): задержка/джиттер/потери/ширина на приёме; профиль общий для процесса
+        // --- network lab (NetLinkSim): latency/jitter/loss/bandwidth on receive; the profile is shared by the process
         private readonly NetLinkSim m_sim = new NetLinkSim();
         private Action<byte[], int, int> m_deliver;
 
-        /// <summary>Старая команда «net sim N»: только задержка N мс в одну сторону.</summary>
+        /// <summary>Old command "net sim N": latency only, N ms one way.</summary>
         public void SimulateLatency(int oneWayMs) => NetLinkSim.Set(oneWayMs > 0 ? $"lat={oneWayMs}" : "off");
 
         private static byte[] Copy(byte[] data, int offset, int length)
@@ -147,7 +147,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Свободен ли UDP-порт (для выбора порта хоста).</summary>
+        /// <summary>Whether a UDP port is free (for choosing the host port).</summary>
         public static bool IsPortFree(int port)
         {
             try

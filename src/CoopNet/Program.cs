@@ -10,10 +10,10 @@ using Steamworks;
 namespace CoopNet
 {
     /// <summary>
-    /// Steam-транспорт коопа Lucky Tower: Spacewar (AppID 480, steam_appid.txt рядом с exe).
-    /// Лобби только для друзей, P2P через SteamNetworkingMessages (NAT/relay Valve).
-    /// Канал 0 — данные игры, канал 1 — служебные сообщения транспорта.
-    /// С плагином общается по LiteNetLib на 127.0.0.1 (порт в --ipc).
+    /// Lucky Tower co-op Steam transport: Spacewar (AppID 480, steam_appid.txt next to the exe).
+    /// Friends-only lobbies, P2P via SteamNetworkingMessages (NAT/Valve relay).
+    /// Channel 0 carries game data, channel 1 carries transport control messages.
+    /// Talks to the plugin over LiteNetLib on 127.0.0.1 (port given by --ipc).
     /// </summary>
     internal static class Program
     {
@@ -45,8 +45,8 @@ namespace CoopNet
 
         private static readonly IntPtr[] s_msgs = new IntPtr[64];
 
-        // Без запроса точного таймера Windows будит процесс раз в 15,6 мс: Thread.Sleep(1) в цикле и тик LiteNetLib
-        // (UpdateTime=1) на деле длились 15,6 мс, и каждый пакет ждал до 2 таких тиков в каждом CoopNet.
+        // Without requesting a precise timer, Windows wakes the process every 15.6 ms: Thread.Sleep(1) in a loop and the LiteNetLib tick
+        // (UpdateTime=1) actually took 15.6 ms, and each packet waited up to 2 such ticks in each CoopNet.
         [DllImport("winmm.dll")]
         private static extern uint timeBeginPeriod(uint ms);
 
@@ -76,7 +76,7 @@ namespace CoopNet
 
             try { timeBeginPeriod(1); } catch { }
 
-            // IPC сначала — чтобы сообщить плагину об ошибке Steam
+            // IPC first, so the plugin can be told about a Steam error
             var listener = new EventBasedNetListener();
             s_ipc = new NetManager(listener) { AutoRecycle = true, UnsyncedEvents = false, DisconnectTimeout = 15000, UpdateTime = 1 };
             listener.PeerConnectedEvent += p => s_plugin = p;
@@ -95,7 +95,7 @@ namespace CoopNet
                 return 3;
             }
             {
-                // самопроверка таймера: сколько на деле длится Sleep(1) (без timeBeginPeriod было 15,6 мс)
+                // timer self-check: how long Sleep(1) really takes (15.6 ms without timeBeginPeriod)
                 var sw = Stopwatch.StartNew();
                 for (int i = 0; i < 20; i++)
                 {
@@ -116,7 +116,7 @@ namespace CoopNet
             }
             if (!steamOk)
             {
-                Event("error Steam не запущен или не удалось инициализировать Spacewar (AppID 480)");
+                Event("error Steam is not running or Spacewar (AppID 480) failed to initialize");
                 Flush();
                 return 4;
             }
@@ -153,7 +153,7 @@ namespace CoopNet
             return 0;
         }
 
-        /// <summary>Разрешаем прямое P2P-соединение (ICE) со всеми, не только через ретрансляторы Valve — ниже пинг, если NAT пропускает.</summary>
+        /// <summary>Allow direct P2P connections (ICE) with everyone, not just through Valve relays - lower ping if the NAT allows it.</summary>
         private static void EnableDirectP2P()
         {
             int value = Constants.k_nSteamNetworkingConfig_P2P_Transport_ICE_Enable_All;
@@ -259,20 +259,20 @@ namespace CoopNet
             }
         }
 
-        // ---------------- лобби ----------------
+        // ---------------- lobby ----------------
 
         private static void OnLobbyCreated(LobbyCreated_t r, bool ioFailure)
         {
             if (ioFailure || r.m_eResult != EResult.k_EResultOK)
             {
-                Event($"error не удалось создать лобби: {r.m_eResult}");
+                Event($"error failed to create lobby: {r.m_eResult}");
                 return;
             }
             s_lobby = new CSteamID(r.m_ulSteamIDLobby);
             SteamMatchmaking.SetLobbyData(s_lobby, LobbyKey, "1");
             SteamMatchmaking.SetLobbyData(s_lobby, "host", SteamFriends.GetPersonaName());
             SteamMatchmaking.SetLobbyJoinable(s_lobby, true);
-            SteamFriends.SetRichPresence("status", "Lucky Tower Ultimate — кооп (хост)");
+            SteamFriends.SetRichPresence("status", "Lucky Tower Ultimate - co-op (host)");
             Event($"lobby {s_lobby.m_SteamID}");
         }
 
@@ -290,7 +290,7 @@ namespace CoopNet
         {
             if (ioFailure || r.m_EChatRoomEnterResponse != (uint)EChatRoomEnterResponse.k_EChatRoomEnterResponseSuccess)
             {
-                Event($"error не удалось войти в лобби ({(EChatRoomEnterResponse)r.m_EChatRoomEnterResponse})");
+                Event($"error failed to join lobby ({(EChatRoomEnterResponse)r.m_EChatRoomEnterResponse})");
                 return;
             }
             s_lobby = new CSteamID(r.m_ulSteamIDLobby);
@@ -302,11 +302,11 @@ namespace CoopNet
             var owner = SteamMatchmaking.GetLobbyOwner(s_lobby);
             if (owner == SteamUser.GetSteamID())
             {
-                Event("error это ваше собственное лобби");
+                Event("error this is your own lobby");
                 return;
             }
             SetRemote(owner);
-            SteamFriends.SetRichPresence("status", "Lucky Tower Ultimate — кооп");
+            SteamFriends.SetRichPresence("status", "Lucky Tower Ultimate - co-op");
             SendControl("connect");
         }
 
@@ -320,7 +320,7 @@ namespace CoopNet
                                          | EChatMemberStateChange.k_EChatMemberStateChangeKicked | EChatMemberStateChange.k_EChatMemberStateChangeBanned);
             if (r.m_ulSteamIDUserChanged == s_remote.GetSteamID().m_SteamID && (r.m_rgfChatMemberStateChange & leftMask) != 0)
             {
-                RemoteLost("друг вышел из лобби");
+                RemoteLost("friend left the lobby");
             }
         }
 
@@ -413,7 +413,7 @@ namespace CoopNet
         {
             if (s_hasRemote && r.m_info.m_identityRemote.GetSteamID() == s_remote.GetSteamID())
             {
-                RemoteLost($"сессия Steam прервана ({(ESteamNetConnectionEnd)r.m_info.m_eEndReason})");
+                RemoteLost($"Steam session ended ({(ESteamNetConnectionEnd)r.m_info.m_eEndReason})");
             }
         }
 
@@ -448,7 +448,7 @@ namespace CoopNet
 
         private static void PumpSteamMessages()
         {
-            // служебный канал
+            // control channel
             int n = SteamNetworkingMessages.ReceiveMessagesOnChannel(ControlChannel, s_msgs, s_msgs.Length);
             for (int i = 0; i < n; i++)
             {
@@ -460,7 +460,7 @@ namespace CoopNet
                 OnControl(sender, Encoding.UTF8.GetString(bytes));
             }
 
-            // данные игры
+            // game data
             n = SteamNetworkingMessages.ReceiveMessagesOnChannel(DataChannel, s_msgs, s_msgs.Length);
             for (int i = 0; i < n; i++)
             {
@@ -472,7 +472,7 @@ namespace CoopNet
                     var buf = new byte[msg.m_cbSize + 1];
                     buf[0] = IpcData;
                     Marshal.Copy(msg.m_pData, buf, 1, msg.m_cbSize);
-                    // ненадёжное (снапшоты, ввод) остаётся ненадёжным: устаревшее не должно вставать в очередь
+                    // unreliable (snapshots, input) stays unreliable: stale data must not queue up
                     bool reliable = (msg.m_nFlags & Constants.k_nSteamNetworkingSend_Reliable) != 0;
                     bool fits = buf.Length <= s_plugin.GetMaxSinglePacketSize(DeliveryMethod.Unreliable);
                     s_plugin.Send(buf, 0, buf.Length, 0, reliable || !fits ? DeliveryMethod.ReliableOrdered : DeliveryMethod.Unreliable);
@@ -481,7 +481,7 @@ namespace CoopNet
             }
             if (n > 0)
             {
-                s_ipc.TriggerUpdate(); // отправить в игру сейчас, а не на следующем тике LiteNetLib
+                s_ipc.TriggerUpdate(); // send to the game now rather than on the next LiteNetLib tick
             }
         }
 
@@ -490,7 +490,7 @@ namespace CoopNet
             switch (text)
             {
                 case "connect":
-                    // хост: друг вошёл в лобби и стучится
+                    // host: a friend joined the lobby and is knocking
                     if (s_isHost && IsLobbyMember(sender))
                     {
                         SetRemote(sender);
@@ -512,7 +512,7 @@ namespace CoopNet
                 case "bye":
                     if (s_hasRemote && sender == s_remote.GetSteamID())
                     {
-                        RemoteLost("друг отключился");
+                        RemoteLost("friend disconnected");
                     }
                     break;
                 case "ping":
@@ -527,7 +527,7 @@ namespace CoopNet
         private static void Tick()
         {
             var now = DateTime.UtcNow;
-            // клиент: пока не приняли — стучимся раз в секунду
+            // client: until accepted, knock once per second
             if (!s_isHost && s_hasRemote && !s_remoteConnected && (now - s_lastPing).TotalSeconds > 1)
             {
                 s_lastPing = now;

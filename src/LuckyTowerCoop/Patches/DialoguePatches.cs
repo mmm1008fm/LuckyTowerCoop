@@ -7,10 +7,10 @@ using LuckyTowerCoop.Net;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Реплики персонажей (субтитры над головой, голос, анимация «Talking»).
-    /// Хост: каждую начатую реплику пересылает клиенту (кто говорит + ключ текста).
-    /// Клиент: свои реплики не запускает (иначе персонаж «говорит» сам по себе и дёргается против снапшотов хоста),
-    /// проигрывает только присланные хостом.
+    /// Character lines (subtitles overhead, voice, "Talking" animation).
+    /// Host: forwards every started line to the client (who speaks + text key).
+    /// Client: does not start its own lines (otherwise the character "talks" on its own and jitters against host snapshots),
+    /// plays only those sent by the host.
     /// </summary>
     [HarmonyPatch(typeof(DialogueManager))]
     internal static class DialoguePatches

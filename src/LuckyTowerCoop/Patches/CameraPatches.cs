@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace LuckyTowerCoop.Patches
 {
-    /// <summary>Зоны переключения камеры (и их одноразовые события) реагируют только на P1.</summary>
+    /// <summary>Camera switch zones (and their one-shot events) react only to P1.</summary>
     [HarmonyPatch(typeof(SnapCameraToCollider))]
     internal static class SnapCameraToColliderPatches
     {

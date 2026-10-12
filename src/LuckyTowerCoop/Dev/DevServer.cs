@@ -15,8 +15,8 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Dev
 {
     /// <summary>
-    /// Отладочные команды по UDP 127.0.0.1 (только при Dev.CommandServer=true).
-    /// Позволяет автоматически проверять мод: нажатия за P1/P2, спавн, загрузка сцен, скриншоты.
+    /// Debug commands over UDP 127.0.0.1 (only when Dev.CommandServer=true).
+    /// Lets the mod be tested automatically: key presses for P1/P2, spawning, scene loading, screenshots.
     /// </summary>
     public class DevServer : MonoBehaviour
     {
@@ -33,7 +33,7 @@ namespace LuckyTowerCoop.Dev
         private static bool s_god;
         private readonly float?[] m_walkTarget = new float?[2];
         private readonly float[] m_walkDeadline = new float[2];
-        // patrol: ходить туда-обратно между двумя точками до срока (стенд качества сети)
+        // patrol: walk back and forth between two points until the deadline (network quality test bench)
         private readonly float[] m_patrolA = new float[2];
         private readonly float[] m_patrolB = new float[2];
         private readonly float[] m_patrolUntil = new float[2];
@@ -51,7 +51,7 @@ namespace LuckyTowerCoop.Dev
             {
                 return;
             }
-            // Несколько копий игры (тест онлайна на одном ПК): занимаем первый свободный порт
+            // Several game copies (online test on one PC): take the first free port
             for (int port = CoopConfig.DevPort.Value; port < CoopConfig.DevPort.Value + 4; port++)
             {
                 try
@@ -112,7 +112,7 @@ namespace LuckyTowerCoop.Dev
                 }
             }
 
-            // Скриптовый ввод привязываем к актуальным id Rewired-игроков
+            // Bind scripted input to the current Rewired player ids
             var p1 = CoopInput.P1Input;
             var p2 = CoopInput.P2Input;
             if (p1 != null)
@@ -139,7 +139,7 @@ namespace LuckyTowerCoop.Dev
             {
                 if (m_walkTarget[i] == null && Time.realtimeSinceStartup < m_patrolUntil[i])
                 {
-                    // дошёл до края — разворот
+                    // reached the edge - turn around
                     var pw = GamePlayer.VonWansts[i];
                     float px = pw != null ? pw.transform.position.x : 0f;
                     m_walkTarget[i] = Mathf.Abs(px - m_patrolA[i]) < Mathf.Abs(px - m_patrolB[i]) ? m_patrolB[i] : m_patrolA[i];
@@ -258,7 +258,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "itemnames":
                 {
-                    // itemnames [часть имени] — имена предметов библиотеки игры
+                    // itemnames [name part] - item names from the game's library
                     var names = new System.Collections.Generic.List<string>();
                     if (gm != null)
                     {
@@ -275,7 +275,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "kegboom":
                 {
-                    // kegboom — взорвать башню бочкой (вызов DestroyTower у бочки-ловушки или бочки-предмета этой сцены)
+                    // kegboom - blow up the tower with a keg (calls DestroyTower on a trap keg or an item keg in this scene)
                     foreach (var k in UnityEngine.Object.FindObjectsByType<LuckyTower.Traps.TrapPowderKeg>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
                     {
                         k.DestroyTower();
@@ -286,7 +286,7 @@ namespace LuckyTowerCoop.Dev
                         k.DestroyTower();
                         return $"SpecialItemPowderKeg {k.name}.DestroyTower()";
                     }
-                    // в сцене бочек нет (они в комнатах поздних сегментов) — пустышка с тем же компонентом: проверка сети, не игры
+                    // no kegs in the scene (they are in rooms of later segments) - a dummy with the same component: tests the network, not the game
                     var dummy = new GameObject("DevKeg");
                     var dk = dummy.AddComponent<LuckyTower.Traps.TrapPowderKeg>();
                     dk.DestroyTower();
@@ -295,14 +295,14 @@ namespace LuckyTowerCoop.Dev
 
                 case "gencaves":
                 {
-                    // gencaves — создать подряд сегменты 2…пещеры без захода в комнаты (одинаково на хосте и клиенте), для сверки генерации
+                    // gencaves - create segments 2...caves in a row without entering the rooms (identically on host and client), to compare generation
                     StartCoroutine(GenAllRoutine());
                     return "generating segments 2..CaveOne (see log: [Dev] gencaves done)";
                 }
 
                 case "cavehash":
                 {
-                    // cavehash [файл] — отпечаток пещер: комнаты (имя, тип, сегмент) и дочерние элементы уровня; полный список — в файл
+                    // cavehash [file] - cave fingerprint: rooms (name, type, segment) and the level's child elements; the full list goes to a file
                     var sbc = new StringBuilder();
                     var roomsC = new System.Collections.Generic.List<LuckyTower.RoomGeneration.Room>();
                     foreach (var r in UnityEngine.Object.FindObjectsByType<LuckyTower.RoomGeneration.Room>(FindObjectsInactive.Include, FindObjectsSortMode.None))
@@ -340,7 +340,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "find":
                 {
-                    // find <подстрока имени> — объекты сцены (включая неактивные): путь, позиция, активность (до 25)
+                    // find <name substring> - scene objects (including inactive): path, position, active state (up to 25)
                     if (args.Length < 2)
                     {
                         return "usage: find <name part>";
@@ -367,7 +367,7 @@ namespace LuckyTowerCoop.Dev
                 }
 
                 case "seed":
-                    // seed N — зафиксировать сид забега (хост/локально) до `load tower`; seed 0 — снова случайный
+                    // seed N - fix the run seed (host/local) before `load tower`; seed 0 - random again
                     DevSeedPatch.Forced = args.Length > 1 ? int.Parse(args[1]) : 0;
                     return $"forced seed={DevSeedPatch.Forced}";
 
@@ -407,7 +407,7 @@ namespace LuckyTowerCoop.Dev
                             s.Stop("dev");
                             break;
                         case "drop":
-                            // имитация обрыва связи без Bye
+                            // simulate a connection drop without Bye
                             s.Transport?.Disconnect();
                             break;
                         case "continue":
@@ -430,17 +430,17 @@ namespace LuckyTowerCoop.Dev
                             }
                             break;
                         case "link":
-                            // net link off|lan|good|wifi|bad|awful | lat=.. jit=.. loss=.. bw=..  (ставить на обеих копиях)
+                            // net link off|lan|good|wifi|bad|awful | lat=.. jit=.. loss=.. bw=..  (set on both copies)
                             return "link: " + Net.NetLinkSim.Set(args.Length > 2 ? string.Join(" ", args, 2, args.Length - 2) : "off");
                         case "interp":
-                            // net interp buffer|legacy — буфер интерполяции у клиента
+                            // net interp buffer|legacy - the client's interpolation buffer
                             if (args.Length > 2)
                             {
                                 CoopConfig.NetInterp.Value = args[2] != "legacy";
                             }
                             return "interp: " + (CoopConfig.NetInterp.Value ? "buffer" : "legacy");
                         case "quality":
-                            // net quality [reset] — метрики качества у клиента
+                            // net quality [reset] - the client's quality metrics
                             if (args.Length > 2 && args[2] == "reset")
                             {
                                 Net.NetQuality.Reset();
@@ -448,7 +448,7 @@ namespace LuckyTowerCoop.Dev
                             }
                             return s.Client != null ? s.Client.QualityReport() : "client only";
                         case "sim":
-                            // net sim <мс в одну сторону> — имитация пинга на Direct (ставить на обеих копиях)
+                            // net sim <ms one way> - simulate ping on Direct (set on both copies)
                             if (s.Transport is Net.LnlTransport lnl)
                             {
                                 lnl.SimulateLatency(args.Length > 2 ? int.Parse(args[2]) : 25);
@@ -462,7 +462,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "free":
                 {
-                    // снять замки движения/ввода с обоих игроков (автотест: бочка с порохом, прерванные катсцены)
+                    // release movement/input locks on both players (autotest: powder keg, interrupted cutscenes)
                     int n = 0;
                     foreach (var w in GamePlayer.VonWansts)
                     {
@@ -475,7 +475,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "unlock":
                 {
-                    // поднять решётки всех дверей текущей комнаты (запертые комнаты с рычагами/дробилками в автотесте)
+                    // raise the gates of all doors in the current room (locked rooms with levers/crushers in the autotest)
                     var room = gm != null ? gm.CurrentRoom : null;
                     if (room == null)
                     {
@@ -491,7 +491,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "rooms":
                 {
-                    // все комнаты башни (сверка генерации хост/клиент)
+                    // all tower rooms (host/client generation comparison)
                     var list = new System.Collections.Generic.List<string>();
                     foreach (var r in UnityEngine.Object.FindObjectsByType<LuckyTower.RoomGeneration.Room>(FindObjectsInactive.Include, FindObjectsSortMode.None))
                     {
@@ -503,7 +503,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "shops":
                 {
-                    // автоматы / магазины / ремонтники по всем комнатам (включая неактивные): тип, имя, позиция, комната
+                    // vending machines / shops / repairmen across all rooms (including inactive): type, name, position, room
                     var sb = new StringBuilder();
                     void Scan<T>() where T : MonoBehaviour
                     {
@@ -535,7 +535,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "ent":
                 {
-                    // ent <id> — путь и активность сущности по цепочке родителей
+                    // ent <id> - the entity's path and active state along the parent chain
                     var s = Net.NetSession.Instance;
                     if (args.Length < 2 || !int.TryParse(args[1], out var entId))
                     {
@@ -578,7 +578,7 @@ namespace LuckyTowerCoop.Dev
                     return CoopInput.EnsureKeyboardMapDebug();
 
                 case "loadkeep":
-                    // как переход через дверь со сменой сцены: без DestroyAll
+                    // like a door transition with a scene change: without DestroyAll
                     SceneLoader.LoadSceneByName(args.Length > 1 && args[1] == "village" ? LuckyTower.Village.VillageManager.LoadScene.VillageRegular : LuckyTower.Village.VillageManager.LoadScene.MasterScene);
                     return "loading (keep players)";
 
@@ -665,7 +665,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "patrol":
                 {
-                    // patrol p1|p2 x1 x2 секунд — ходить туда-обратно (стенд качества сети)
+                    // patrol p1|p2 x1 x2 seconds - walk back and forth (network quality test bench)
                     int idx = args[1] == "p2" ? 1 : 0;
                     m_patrolA[idx] = float.Parse(args[2], CultureInfo.InvariantCulture);
                     m_patrolB[idx] = float.Parse(args[3], CultureInfo.InvariantCulture);
@@ -724,7 +724,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "exits":
                 {
-                    // боковые проходы и люки текущей комнаты (для автотеста маршрута)
+                    // side passages and hatches of the current room (for the route autotest)
                     var sb = new StringBuilder();
                     var room = gm != null ? gm.CurrentRoom : null;
                     if (room == null)
@@ -748,7 +748,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "killall":
                 {
-                    // убить всех врагов текущей комнаты (проверка синхронизации трупов)
+                    // kill all enemies in the current room (corpse sync check)
                     var room = gm != null ? gm.CurrentRoom : null;
                     if (room == null)
                     {
@@ -776,7 +776,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "transform":
                 {
-                    // transform p1|p2 monster|wanst|evelius — превращение (проверка смены тела)
+                    // transform p1|p2 monster|wanst|evelius - transformation (body swap check)
                     var w = GamePlayer.VonWansts[args.Length > 1 && args[1] == "p2" ? 1 : 0];
                     if (w == null)
                     {
@@ -795,19 +795,19 @@ namespace LuckyTowerCoop.Dev
 
                 case "ls":
                 {
-                    // ls <путь от корня комнаты> — дети объекта (сверка иерархии хост/клиент); без пути — корень
+                    // ls <path from the room root> - children of an object (host/client hierarchy comparison); without a path - the root
                     var room = gm != null ? gm.CurrentRoom : null;
                     if (room == null)
                     {
                         return "no room";
                     }
                     string path = args.Length > 1 ? string.Join(" ", args, 1, args.Length - 1) : "";
-                    // имена могут содержать «/» («Window 6/4»): тогда разделитель пути — «|»
+                    // names may contain "/" ("Window 6/4"): then the path separator is "|"
                     path = (path.Contains("|") ? path.Replace('|', '\u001f') : path.Replace('/', '\u001f')).Replace('#', '\u001e');
                     var t = path.Length == 0 ? room.transform : Net.NetPaths.Find(room.transform, path);
                     if (t == null)
                     {
-                        // ищем самый глубокий существующий префикс
+                        // find the deepest existing prefix
                         var parts = path.Split('\u001f');
                         for (int cut = parts.Length - 1; cut >= 1 && t == null; cut--)
                         {
@@ -833,7 +833,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "roomstat":
                 {
-                    // размер иерархии текущей комнаты и её верхние дети (сверка генерации хост/клиент)
+                    // size of the current room's hierarchy and its top-level children (host/client generation comparison)
                     var room = gm != null ? gm.CurrentRoom : null;
                     if (room == null)
                     {
@@ -851,7 +851,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "cam":
                 {
-                    // кто для мода P1/P2, кто для игры «игрок», куда смотрит камера
+                    // who is P1/P2 for the mod, who is "the player" for the game, where the camera is looking
                     string D(GamePlayer p) => p == null ? "null" : $"{p.name}#{p.GetInstanceID()} dead={p.Stats.Dead} hidden={CoopVisibility.IsHidden(p)} pos={p.transform.position:F1}";
                     var cm = CoopCamera.CameraManagerSilent;
                     var follow = cm != null && cm.VirtualCamera != null ? cm.VirtualCamera.Follow : null;
@@ -861,7 +861,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "traps":
                 {
-                    // ловушки текущей комнаты: тип, имя, позиция, активность
+                    // traps in the current room: type, name, position, active state
                     var sb = new StringBuilder();
                     var room = gm != null ? gm.CurrentRoom : null;
                     if (room == null)
@@ -881,7 +881,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "npcs":
                 {
-                    // персонажи-неврaги текущей комнаты (для теста окна диалога)
+                    // NPC characters in the current room (for the dialogue window test)
                     var sb = new StringBuilder();
                     var room = gm != null ? gm.CurrentRoom : null;
                     foreach (var ch in FindObjectsByType<LuckyTower.CharacterSystem.Character>(FindObjectsSortMode.None))
@@ -901,7 +901,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "lights":
                 {
-                    // lights — состояние ловушек «свет погас» в текущей комнате; lights out|on — вызвать (хост)
+                    // lights - state of the "lights out" traps in the current room; lights out|on - trigger them (host)
                     var room = gm != null ? gm.CurrentRoom : null;
                     if (room == null)
                     {
@@ -933,7 +933,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "rend":
                 {
-                    // rend <слот 1-4> — все рендеры персонажа: включён ли, активен ли объект, порядок отрисовки
+                    // rend <slot 1-4> - all of the character's renderers: enabled or not, object active or not, draw order
                     var w = GamePlayer.VonWansts[args.Length > 1 ? int.Parse(args[1]) - 1 : 0];
                     if (w == null)
                     {
@@ -950,7 +950,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "tp":
                 {
-                    // tp p1|p2 x y — переставить персонажа (автотест маршрута по комнатам)
+                    // tp p1|p2 x y - move a character (room route autotest)
                     var w = GamePlayer.VonWansts[args.Length > 1 && args[1] == "p2" ? 1 : 0];
                     if (w == null || args.Length < 4)
                     {
@@ -964,7 +964,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "hurt":
                 {
-                    // hurt p1|p2 — выбить зуб (проверка передачи ХП)
+                    // hurt p1|p2 - knock out a tooth (HP transfer check)
                     var w = GamePlayer.VonWansts[args.Length > 1 && args[1] == "p2" ? 1 : 0];
                     if (w == null)
                     {
@@ -981,7 +981,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "menu":
                 {
-                    // menu <0|1|2> — открыть вкладку меню F7, menu off — закрыть
+                    // menu <0|1|2> - open an F7 menu tab, menu off - close it
                     var menu = FindFirstObjectByType<Net.NetMenu>();
                     if (menu == null)
                     {
@@ -993,7 +993,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "anim":
                 {
-                    // anim [номер слота 1-4]: все аниматоры персонажа — слои, состояния, ненулевые параметры
+                    // anim [slot number 1-4]: all of the character's animators - layers, states, non-zero parameters
                     var sb = new StringBuilder();
                     for (int i = 0; i < GamePlayer.VonWansts.Length; i++)
                     {
@@ -1051,7 +1051,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "gold":
                 {
-                    // gold p1|p2 [N] — показать / установить число монет (хост или локальная игра)
+                    // gold p1|p2 [N] - show / set the coin count (host or local game)
                     if (args.Length < 2)
                     {
                         return "usage: gold p1|p2 [N]";
@@ -1067,7 +1067,7 @@ namespace LuckyTowerCoop.Dev
 
                 case "givecoins":
                 {
-                    // givecoins p1|p2 N — передать напарнику N монет (как кнопка меню; у клиента — просьба хосту)
+                    // givecoins p1|p2 N - give N coins to the partner (like the menu button; on the client it is a request to the host)
                     if (args.Length < 3)
                     {
                         return "usage: givecoins p1|p2 N";
@@ -1137,7 +1137,7 @@ namespace LuckyTowerCoop.Dev
 
 namespace LuckyTowerCoop.Dev
 {
-    /// <summary>Отладка: фиксированный сид забега у хоста (одинаковая башня между запусками).</summary>
+    /// <summary>Debug: fixed run seed on the host (the same tower across launches).</summary>
     [HarmonyLib.HarmonyPatch(typeof(SegmentManager), nameof(SegmentManager.ResetSeed))]
     internal static class DevSeedPatch
     {

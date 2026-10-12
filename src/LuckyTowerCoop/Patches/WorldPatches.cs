@@ -8,9 +8,9 @@ using LuckyTowerCoop.Net;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Клиент-зеркало, мир: ловушки, рычаги, сундуки, полы, спавнеры монстров у клиента не живут своей жизнью —
-    /// их состояние (аниматор, положение, активность) приходит от хоста. Глушим их Update и физические колбэки,
-    /// а также урон по повреждаемым объектам (удар клиента по рычагу решает хост).
+    /// Client mirror, world: traps, levers, chests, floors, monster spawners do not live their own life on the client -
+    /// their state (animator, position, activity) comes from the host. We suppress their Update and physics callbacks,
+    /// as well as damage to damageable objects (the client's hit on a lever is decided by the host).
     /// </summary>
     [HarmonyPatch]
     internal static class WorldSuppressPatches
@@ -22,7 +22,7 @@ namespace LuckyTowerCoop.Patches
             "OnCollisionEnter2D", "OnCollisionExit2D", "OnCollisionStay2D",
         };
 
-        // не-Trap классы с собственной логикой мира
+        // non-Trap classes with their own world logic
         private static readonly string[] s_extraTypes =
         {
             "LuckyTower.Traps.Lever", "LuckyTower.Traps.PuzzleLever", "LuckyTower.Traps.LightsOutLever", "LuckyTower.Traps.PuzzleLeverManager",
@@ -40,7 +40,7 @@ namespace LuckyTowerCoop.Patches
             var types = new HashSet<Type>();
             foreach (var t in asm.GetTypes())
             {
-                // SpecialItem (лампа, зелья) — предметы, FlyingBehaviour (мыши) — уже глушатся отдельно
+                // SpecialItem (lamp, potions) - items, FlyingBehaviour (bats) - already suppressed separately
                 if (typeof(Trap).IsAssignableFrom(t) && !typeof(FlyingBehaviour).IsAssignableFrom(t) && !typeof(SpecialItem).IsAssignableFrom(t))
                 {
                     types.Add(t);
@@ -73,7 +73,7 @@ namespace LuckyTowerCoop.Patches
         private static bool Prefix() => !NetSession.IsClient;
     }
 
-    /// <summary>Повреждаемые объекты мира (рычаги, сундуки, бочки): урон считает только хост.</summary>
+    /// <summary>Damageable world objects (levers, chests, barrels): damage is computed only by the host.</summary>
     [HarmonyPatch(typeof(Damagable))]
     internal static class DamagableClientPatches
     {

@@ -8,9 +8,9 @@ using LiteNetLib;
 namespace LuckyTowerCoop.Net
 {
     /// <summary>
-    /// Steam (Spacewar, AppID 480) через отдельный процесс CoopNet.exe: в процессе игры Steam API уже занят
-    /// AppID игры, а Spacewar нужен свой. Плагин — LiteNetLib-сервер на 127.0.0.1, CoopNet подключается к нему.
-    /// IPC: [1][delivery?][данные] — пакеты удалённой стороне/от неё; [2][текст] — команды/события.
+    /// Steam (Spacewar, AppID 480) via a separate CoopNet.exe process: in the game process the Steam API is already taken
+    /// by the game's AppID, while Spacewar needs its own. The plugin is a LiteNetLib server on 127.0.0.1 that CoopNet connects to.
+    /// IPC: [1][delivery?][data] - packets to/from the remote side; [2][text] - commands/events.
     /// </summary>
     public sealed class SteamSidecarTransport : INetTransport
     {
@@ -25,7 +25,7 @@ namespace LuckyTowerCoop.Net
         private NetPeer m_sidecar;
         private Process m_process;
         private bool m_remoteConnected;
-        private string m_status = "запуск CoopNet…";
+        private string m_status = "starting CoopNet...";
         private byte[] m_buffer = new byte[2048];
         private int m_pingMs = -1;
 
@@ -33,15 +33,15 @@ namespace LuckyTowerCoop.Net
         public event Action<string> Disconnected;
         public event Action<byte[], int, int> Received;
 
-        /// <summary>Лобби (хост: созданное; клиент: в которое вошли).</summary>
+        /// <summary>Lobby (host: the one created; client: the one joined).</summary>
         public ulong LobbyId { get; private set; }
 
         public string MyName { get; private set; } = "";
 
-        /// <summary>Друзья, у которых открыто лобби коопа: (лобби, имя).</summary>
+        /// <summary>Friends with an open co-op lobby: (lobby, name).</summary>
         public List<(ulong lobby, string name)> FriendLobbies { get; } = new List<(ulong, string)>();
 
-        /// <summary>Друзья онлайн для приглашения: (steamId, имя).</summary>
+        /// <summary>Friends online available to invite: (steamId, name).</summary>
         public List<(ulong id, string name)> FriendsOnline { get; } = new List<(ulong, string)>();
 
         public bool IsConnected => m_remoteConnected && m_sidecar != null;
@@ -56,7 +56,7 @@ namespace LuckyTowerCoop.Net
         {
             m_isHost = isHost;
             m_joinLobby = joinLobby;
-            m_ipc = new NetManager(m_listener) { UnsyncedEvents = false, AutoRecycle = true, DisconnectTimeout = 15000, UpdateTime = 1 }; // по умолчанию 15 мс — лишняя задержка на каждом круге
+            m_ipc = new NetManager(m_listener) { UnsyncedEvents = false, AutoRecycle = true, DisconnectTimeout = 15000, UpdateTime = 1 }; // default is 15 ms - extra delay on every round trip
             m_listener.ConnectionRequestEvent += r =>
             {
                 if (m_sidecar == null)
@@ -71,7 +71,7 @@ namespace LuckyTowerCoop.Net
             m_listener.PeerConnectedEvent += p =>
             {
                 m_sidecar = p;
-                m_status = "Steam: инициализация…";
+                m_status = "Steam: initializing...";
             };
             m_listener.PeerDisconnectedEvent += (p, info) =>
             {
@@ -80,34 +80,34 @@ namespace LuckyTowerCoop.Net
                     return;
                 }
                 m_sidecar = null;
-                m_status = "CoopNet отключился";
+                m_status = "CoopNet disconnected";
                 if (m_remoteConnected)
                 {
                     m_remoteConnected = false;
-                    Disconnected?.Invoke("CoopNet закрыт");
+                    Disconnected?.Invoke("CoopNet closed");
                 }
             };
             m_listener.NetworkReceiveEvent += (p, reader, ch, method) => OnIpc(reader.RawData, reader.Position, reader.AvailableBytes, method == DeliveryMethod.ReliableOrdered);
         }
 
-        /// <summary>Качество Steam-участка (раз в секунду из CoopNet).</summary>
+        /// <summary>Quality of the Steam leg (once a second from CoopNet).</summary>
         public struct SteamStats
         {
             public bool Valid;
             public int Ping;
-            public float QualityLocal;   // доля пакетов, дошедших к нам (1 = без потерь)
-            public float QualityRemote;  // доля наших пакетов, дошедших до друга
+            public float QualityLocal;   // fraction of packets that reached us (1 = no loss)
+            public float QualityRemote;  // fraction of our packets that reached the friend
             public float OutBps;
             public float InBps;
-            public int SendRateBps;      // текущий потолок скорости отправки Steam
+            public int SendRateBps;      // current Steam send rate cap
             public int PendingUnreliable;
             public int PendingReliable;
             public int UnackedReliable;
-            public float QueueMs;        // сколько пакет ждёт в очереди отправки
+            public float QueueMs;        // how long a packet waits in the send queue
             public bool Relayed;
 
             public string Short() => !Valid ? "" :
-                $"потери у нас {(1f - QualityLocal) * 100f:F0}% у друга {(1f - QualityRemote) * 100f:F0}% · очередь {QueueMs:F0} мс · лимит {SendRateBps / 1024} кБ/с{(Relayed ? " · через ретранслятор Valve" : " · напрямую")}";
+                $"loss: you {(1f - QualityLocal) * 100f:F0}% friend {(1f - QualityRemote) * 100f:F0}% - queue {QueueMs:F0} ms - limit {SendRateBps / 1024} KB/s{(Relayed ? " - via Valve relay" : " - direct")}";
         }
 
         public SteamStats Stats { get; private set; }
@@ -140,7 +140,7 @@ namespace LuckyTowerCoop.Net
                 Relayed = p[10] == "1",
             };
             Stats = s;
-            // след в логе: после игры с другом видно, где терялось время (и предупреждение при плохом соединении)
+            // log trail: after playing with a friend you can see where time was lost (and a warning on a bad connection)
             bool bad = s.QueueMs > 50f || s.QualityLocal < 0.98f || s.QualityRemote < 0.98f;
             if (bad || UnityEngine.Time.unscaledTime >= m_nextStatsLog)
             {
@@ -165,12 +165,12 @@ namespace LuckyTowerCoop.Net
         {
             if (!File.Exists(SidecarPath))
             {
-                throw new FileNotFoundException("не найден CoopNet.exe (Steam-транспорт)", SidecarPath);
+                throw new FileNotFoundException("CoopNet.exe not found (Steam transport)", SidecarPath);
             }
             var t = new SteamSidecarTransport(host, lobby);
             if (!t.m_ipc.Start(System.Net.IPAddress.Loopback, System.Net.IPAddress.IPv6Loopback, 0))
             {
-                throw new InvalidOperationException("не удалось открыть IPC-порт");
+                throw new InvalidOperationException("failed to open the IPC port");
             }
             var psi = new ProcessStartInfo(SidecarPath, $"--ipc {t.m_ipc.LocalPort} --parent {Process.GetCurrentProcess().Id}")
             {
@@ -196,7 +196,7 @@ namespace LuckyTowerCoop.Net
             }
             if (data[offset] == IpcData)
             {
-                if (!m_sim.Intercept(data, offset + 1, length - 1, reliable)) // сетевая лаборатория поверх Steam
+                if (!m_sim.Intercept(data, offset + 1, length - 1, reliable)) // network lab on top of Steam
                 {
                     Received?.Invoke(data, offset + 1, length - 1);
                 }
@@ -217,23 +217,23 @@ namespace LuckyTowerCoop.Net
             {
                 case "ready":
                     MyName = arg;
-                    m_status = m_isHost ? "Steam: создание лобби…" : m_joinLobby != 0 ? $"Steam: вход в лобби {m_joinLobby}…" : "Steam: выберите друга";
+                    m_status = m_isHost ? "Steam: creating lobby..." : m_joinLobby != 0 ? $"Steam: joining lobby {m_joinLobby}..." : "Steam: pick a friend";
                     Command(m_isHost ? "host" : m_joinLobby != 0 ? $"join {m_joinLobby}" : "friends");
                     break;
                 case "lobby":
                     LobbyId = ulong.TryParse(arg, out var id) ? id : 0;
-                    m_status = m_isHost ? $"лобби {LobbyId} — ждём друга" : $"в лобби {LobbyId}, соединение с хостом…";
+                    m_status = m_isHost ? $"lobby {LobbyId} - waiting for a friend" : $"in lobby {LobbyId}, connecting to host...";
                     break;
                 case "peer-connected":
                     m_remoteConnected = true;
-                    m_status = $"соединено со Steam: {arg}";
+                    m_status = $"connected via Steam: {arg}";
                     Connected?.Invoke();
                     break;
                 case "peer-disconnected":
                     if (m_remoteConnected)
                     {
                         m_remoteConnected = false;
-                        m_status = $"разрыв: {arg}";
+                        m_status = $"disconnected: {arg}";
                         Disconnected?.Invoke(arg);
                     }
                     break;
@@ -292,7 +292,7 @@ namespace LuckyTowerCoop.Net
 
         public void Invite(ulong friend) => Command($"invite {friend}");
 
-        /// <summary>Клиент: повторно войти в то же лобби (переподключение).</summary>
+        /// <summary>Client: re-join the same lobby (reconnect).</summary>
         public void Rejoin()
         {
             if (!m_isHost && LobbyId != 0)
@@ -313,7 +313,7 @@ namespace LuckyTowerCoop.Net
             m_sim.Pump(m_deliver ??= (d, o, l) => Received?.Invoke(d, o, l));
             if (m_process != null && m_process.HasExited && m_sidecar == null)
             {
-                m_status = $"CoopNet завершился (код {m_process.ExitCode}) — см. лог";
+                m_status = $"CoopNet exited (code {m_process.ExitCode}) - see the log";
             }
         }
 
@@ -330,9 +330,9 @@ namespace LuckyTowerCoop.Net
             m_buffer[0] = IpcData;
             m_buffer[1] = (byte)(delivery == Delivery.Reliable ? 1 : 0);
             Buffer.BlockCopy(data, 0, m_buffer, 2, length);
-            // ненадёжное и на участке игра-CoopNet ненадёжное: устаревший снапшот лучше потерять, чем доставить поздно
+            // unreliable on the game-CoopNet leg too: a stale snapshot is better lost than delivered late
             var method = delivery == Delivery.Reliable || length + 2 > m_sidecar.GetMaxSinglePacketSize(DeliveryMethod.Unreliable)
-                ? DeliveryMethod.ReliableOrdered // слишком большое для одного ненадёжного пакета — лучше надёжно, чем исключение
+                ? DeliveryMethod.ReliableOrdered // too large for a single unreliable packet - better reliable than an exception
                 : DeliveryMethod.Unreliable;
             m_sidecar.Send(m_buffer, 0, length + 2, 0, method);
             m_ipc.TriggerUpdate();

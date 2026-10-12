@@ -6,12 +6,12 @@ using UnityEngine.SceneManagement;
 namespace LuckyTowerCoop.Coop
 {
     /// <summary>
-    /// Жизненный цикл коопа: Rewired, второй игрок в каждой сцене (перенесённый из прошлой сцены
-    /// или новый), поддержка состояния.
+    /// Co-op lifecycle: Rewired, the second player in each scene (carried over from the previous scene
+    /// or new), state upkeep.
     /// </summary>
     public class CoopManager : MonoBehaviour
     {
-        /// <summary>P2 перенесён из прошлой сцены (DontDestroyOnLoad) и ждёт размещения рядом с P1.</summary>
+        /// <summary>P2 carried over from the previous scene (DontDestroyOnLoad), waiting to be placed next to P1.</summary>
         public static bool CarryP2;
 
         private float m_readySince = -1f;
@@ -37,7 +37,7 @@ namespace LuckyTowerCoop.Coop
 
             CoopInput.Tick();
 
-            // клиент онлайна: персонажи — марионетки хоста, их создаёт NetClient
+            // online client: the characters are host puppets, created by NetClient
             if (Net.NetSession.IsClient)
             {
                 CoopPlayers.Enforce();
@@ -70,7 +70,7 @@ namespace LuckyTowerCoop.Coop
             }
             else if (Net.NetSession.IsHost && Net.NetSession.PeerReady && CoopPlayers.P2 == null && !CoopLife.SomeoneDead)
             {
-                // онлайн: напарник подключился посреди сцены — создаём его персонажа
+                // online: the partner joined mid-scene - create their character
                 var p1 = CoopPlayers.P1;
                 if (p1 != null && !p1.Stats.Dead && !gm.InEnterDoor)
                 {
@@ -102,7 +102,7 @@ namespace LuckyTowerCoop.Coop
             }
 
             CarryP2 = false;
-            // онлайн-хост: второй персонаж — это напарник, без него не создаём
+            // online host: the second character is the partner; do not create without them
             bool allowed = Net.NetSession.IsHost ? Net.NetSession.PeerReady : CoopConfig.AutoSpawnP2.Value;
             if (allowed && p2 == null)
             {

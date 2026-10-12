@@ -6,24 +6,24 @@ using UnityEngine.SceneManagement;
 namespace LuckyTowerCoop.Net
 {
     /// <summary>
-    /// Онлайн-сессия: транспорт, рукопожатие, heartbeat, обрыв и переподключение.
-    /// Хост-авторитет: мир считает хост (NetHost), клиент — зеркало (NetClient).
+    /// Online session: transport, handshake, heartbeat, drop detection and reconnect.
+    /// Host-authoritative: the host simulates the world (NetHost), the client is a mirror (NetClient).
     /// </summary>
     public class NetSession : MonoBehaviour
     {
         public enum State
         {
             Off,
-            /// <summary>Хост ждёт первого подключения.</summary>
+            /// <summary>Host waits for the first connection.</summary>
             Listening,
-            /// <summary>Клиент устанавливает соединение.</summary>
+            /// <summary>Client is establishing the connection.</summary>
             Connecting,
-            /// <summary>Транспорт соединён, идёт Hello/Welcome.</summary>
+            /// <summary>Transport is connected, Hello/Welcome in progress.</summary>
             Handshaking,
             Connected,
-            /// <summary>Хост: напарник пропал, место держится.</summary>
+            /// <summary>Host: the partner is gone, their slot is held.</summary>
             PeerLost,
-            /// <summary>Клиент: связь потеряна, переподключаемся.</summary>
+            /// <summary>Client: connection lost, reconnecting.</summary>
             Reconnecting,
         }
 
@@ -33,10 +33,10 @@ namespace LuckyTowerCoop.Net
 
         public static bool IsHost => Role == NetRole.Host;
 
-        /// <summary>Клиент-зеркало: пока сессия клиента активна (в том числе во время переподключения), мир у себя не симулируем.</summary>
+        /// <summary>Mirror client: while the client session is active (including during reconnect) the world is not simulated locally.</summary>
         public static bool IsClient => Role == NetRole.Client;
 
-        /// <summary>Хост: клиент подключён и прошёл рукопожатие.</summary>
+        /// <summary>Host: the client is connected and has completed the handshake.</summary>
         public static bool PeerReady => Instance != null && Instance.m_state == State.Connected;
 
         public State CurrentState => m_state;
@@ -75,7 +75,7 @@ namespace LuckyTowerCoop.Net
             Instance = this;
         }
 
-        // ================= запуск / остановка =================
+        // ================= start / stop =================
 
         public void StartHost(NetTransportKind kind)
         {
@@ -87,7 +87,7 @@ namespace LuckyTowerCoop.Net
             }
             catch (Exception e)
             {
-                StatusText = "не удалось запустить хост: " + e.Message;
+                StatusText = "failed to start host: " + e.Message;
                 Plugin.Log.LogError($"[Net] host start failed: {e}");
                 return;
             }
@@ -125,7 +125,7 @@ namespace LuckyTowerCoop.Net
             }
             catch (Exception e)
             {
-                StatusText = "не удалось подключиться: " + e.Message;
+                StatusText = "failed to connect: " + e.Message;
                 Plugin.Log.LogError($"[Net] join failed: {e}");
                 return;
             }
@@ -177,17 +177,17 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Хост выбрал «играть одному»: пауза снята, но напарник по-прежнему может вернуться.</summary>
+        /// <summary>Host chose "play solo": pause released, but the partner can still come back.</summary>
         public bool AloneChosen { get; private set; }
 
-        /// <summary>Хост: продолжить без отключившегося напарника (он может вернуться, пока сессия открыта).</summary>
+        /// <summary>Host: continue without the disconnected partner (they can return while the session is open).</summary>
         public void ContinueAlone()
         {
             AloneChosen = true;
             Unpause();
         }
 
-        /// <summary>Хост: снова ждать напарника на паузе.</summary>
+        /// <summary>Host: wait for the partner again, paused.</summary>
         public void WaitForPeer()
         {
             AloneChosen = false;
@@ -205,12 +205,12 @@ namespace LuckyTowerCoop.Net
             m_transport.Connected += OnTransportConnected;
             m_transport.Disconnected += OnTransportDisconnected;
             m_transport.Received += OnReceived;
-            // свернул окно — игра не должна вставать: иначе через 6 с связь рвётся, а персонаж напарника у хоста погибает
+            // window minimized - the game must not stall: otherwise the link drops after 6 s and the partner's character dies on the host
             if (!m_bgSaved)
             {
                 m_bgPrev = Application.runInBackground;
                 m_bgSaved = true;
-                // точный таймер на время сессии: поток LiteNetLib (UpdateTime=1) иначе может тикать раз в 15,6 мс
+                // precise timer for the session duration: the LiteNetLib thread (UpdateTime=1) may otherwise tick only every 15.6 ms
                 try { timeBeginPeriod(1); } catch { }
             }
             Application.runInBackground = true;
@@ -245,7 +245,7 @@ namespace LuckyTowerCoop.Net
             Stop("quit");
         }
 
-        // ================= отправка =================
+        // ================= sending =================
 
         public NetDataWriter Begin(Msg type)
         {
@@ -268,12 +268,12 @@ namespace LuckyTowerCoop.Net
         private long m_bytesIn;
         private float m_rateTime;
 
-        /// <summary>Трафик за последнюю секунду, кБ/с.</summary>
+        /// <summary>Traffic over the last second, KB/s.</summary>
         public float KbOut { get; private set; }
 
         public float KbIn { get; private set; }
 
-        // ================= события транспорта =================
+        // ================= transport events =================
 
         private void OnTransportConnected()
         {
@@ -293,7 +293,7 @@ namespace LuckyTowerCoop.Net
 
         private void OnTransportDisconnected(string reason)
         {
-            OnPeerLost("транспорт: " + reason);
+            OnPeerLost("transport: " + reason);
         }
 
         private void OnReceived(byte[] data, int offset, int length)
@@ -317,14 +317,14 @@ namespace LuckyTowerCoop.Net
                         OnWelcome(m_reader);
                         return;
                     case Msg.Reject:
-                        StatusText = "хост отклонил подключение: " + m_reader.GetString();
+                        StatusText = "host rejected the connection: " + m_reader.GetString();
                         Plugin.Log.LogWarning($"[Net] {StatusText}");
                         Stop("rejected");
                         return;
                     case Msg.Heartbeat:
                         return;
                     case Msg.Bye:
-                        OnPeerLost("напарник вышел: " + m_reader.GetString());
+                        OnPeerLost("partner left: " + m_reader.GetString());
                         return;
                 }
                 if (m_state != State.Connected)
@@ -359,7 +359,7 @@ namespace LuckyTowerCoop.Net
             if (proto != NetConst.ProtocolVersion)
             {
                 var w = Begin(Msg.Reject);
-                w.Put($"разные версии мода (хост {Plugin.Version}, у вас {modVersion})");
+                w.Put($"mod version mismatch (host {Plugin.Version}, you {modVersion})");
                 Send(w, Delivery.Reliable);
                 return;
             }
@@ -424,7 +424,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= кадр =================
+        // ================= frame =================
 
         private void Update()
         {
@@ -457,17 +457,17 @@ namespace LuckyTowerCoop.Net
             if ((m_state == State.Connected || m_state == State.Handshaking) && now - m_lastRecv > NetConst.TimeoutSeconds)
             {
                 m_transport.Disconnect();
-                OnPeerLost("нет ответа");
+                OnPeerLost("no response");
             }
 
             switch (m_state)
             {
                 case State.PeerLost:
-                    // ждём без срока; если задан ReconnectSeconds — по истечении просто снимаем паузу
+                    // wait indefinitely; if ReconnectSeconds is set - just release the pause once it expires
                     float limit = CoopConfig.NetReconnectSeconds.Value;
                     if (limit > 0f && !AloneChosen && now - LostAt > limit)
                     {
-                        Plugin.Log.LogInfo("[Net] wait limit reached — continuing alone (partner can still return)");
+                        Plugin.Log.LogInfo("[Net] wait limit reached - continuing alone (partner can still return)");
                         ContinueAlone();
                     }
                     break;
@@ -497,7 +497,7 @@ namespace LuckyTowerCoop.Net
                 steam.Rejoin();
                 return;
             }
-            // Direct: новый транспорт с тем же адресом, токен сохраняется
+            // Direct: new transport with the same address, the token is kept
             Unhook();
             m_transport.Dispose();
             try
@@ -516,13 +516,13 @@ namespace LuckyTowerCoop.Net
             m_state = s;
             StatusText = s switch
             {
-                State.Off => "не в сети",
-                State.Listening => "ожидание напарника",
-                State.Connecting => "подключение…",
-                State.Handshaking => "рукопожатие…",
-                State.Connected => $"в игре с {PeerName}",
-                State.PeerLost => "напарник отключился — ждём переподключения",
-                State.Reconnecting => "связь потеряна — переподключение…",
+                State.Off => "offline",
+                State.Listening => "waiting for partner",
+                State.Connecting => "connecting...",
+                State.Handshaking => "handshaking...",
+                State.Connected => $"playing with {PeerName}",
+                State.PeerLost => "partner disconnected - waiting to reconnect",
+                State.Reconnecting => "connection lost - reconnecting...",
                 _ => StatusText,
             };
         }

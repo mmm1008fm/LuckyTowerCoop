@@ -9,7 +9,7 @@ using LuckyTowerCoop.Coop;
 
 namespace LuckyTowerCoop.Patches
 {
-    /// <summary>Смерть одного игрока при живом напарнике не заканчивает забег.</summary>
+    /// <summary>One player's death while the partner is alive does not end the run.</summary>
     [HarmonyPatch]
     internal static class DeathPatches
     {
@@ -42,7 +42,7 @@ namespace LuckyTowerCoop.Patches
             return __exception;
         }
 
-        // --- глушим «конец забега», пока жив кто-то из игроков ---
+        // --- suppress "game over" while any player is alive ---
 
         [HarmonyPatch(typeof(GameManager), nameof(GameManager.ShowDeathUI))]
         [HarmonyPrefix]
@@ -50,13 +50,13 @@ namespace LuckyTowerCoop.Patches
         {
             if (CoopLife.DyingInCoop != null || (CoopLife.SomeoneDead && CoopPlayers.P1 != null && !CoopPlayers.P1.Stats.Dead))
             {
-                Plugin.Log.LogInfo("[Life] game over suppressed — partner alive");
+                Plugin.Log.LogInfo("[Life] game over suppressed - partner alive");
                 return false;
             }
             return true;
         }
 
-        // клиент: конец забега решает хост (придёт GameOver/SceneLoad) — свои похороны/очистку боя не запускаем
+        // client: the host decides the end of the run (GameOver/SceneLoad will arrive) - do not start our own funeral/combat cleanup
         private static bool Client => Net.NetSession.IsClient;
 
         [HarmonyPatch(typeof(VillageManager), nameof(VillageManager.FuneralCutScene))]
@@ -90,13 +90,13 @@ namespace LuckyTowerCoop.Patches
         [HarmonyPrefix]
         private static bool RemoveAllCompanions() => CoopLife.DyingInCoop == null && !Client;
 
-        // --- счётчик убийств ---
+        // --- kill counter ---
 
         [HarmonyPatch(typeof(AchievementManager), nameof(AchievementManager.TrackDeath))]
         [HarmonyPostfix]
         private static void TrackDeath(Character character, IDamageSource damageSource) => CoopLife.OnCharacterKilled(character, damageSource);
 
-        // --- игра сама создала главного персонажа (новый забег / бутылка) ---
+        // --- the game itself created the main character (new run / bottle) ---
 
         [HarmonyPatch(typeof(GameManager), nameof(GameManager.SpawnPlayer))]
         [HarmonyPostfix]

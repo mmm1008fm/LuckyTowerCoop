@@ -5,9 +5,9 @@ using LuckyTowerCoop.Net;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Эвелиус (злой маг в хабах) — решает хост: появление, настроение, охота, сундуки. У клиента его логика не выполняется
-    /// (Update/триггеры глушатся списком WorldSuppressPatches), а Start не даёт ему самоуничтожиться по положению марионетки игрока.
-    /// Позиция/анимация приходят как у любого объекта мира, реплики — через Talk/Window.
+    /// Evelius (the evil mage in hubs) - the host decides: appearance, mood, hunting, chests. His logic does not run on the client
+    /// (Update/triggers are suppressed by the WorldSuppressPatches list), and Start keeps him from self-destructing based on the player puppet's position.
+    /// Position/animation arrive like any world object; lines go through Talk/Window.
     /// </summary>
     [HarmonyPatch(typeof(EveliusController), "Start")]
     internal static class EveliusStartPatch

@@ -13,18 +13,18 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// «Кто сейчас игрок» для второго персонажа — системно. Код игры читает Player.CurrentPlayer / GameManager.Player;
-    /// подмена (TargetSwap) раньше стояла только на Update второго персонажа. Здесь она расширяется на:
-    ///  • корутины, запущенные на его объекте (конец скольжения на банане, задержки действий);
-    ///  • физические колбэки любых объектов, в которые вошёл его коллайдер (ловушки, магазины, джинн, зеркало);
-    ///  • Update/FixedUpdate/LateUpdate компонентов на его объекте (окно диалога, оружие в руке, цвет, анимация).
-    /// На клиенте не работает: там второй персонаж — марионетка хоста.
+    /// "Who is the player right now" for the second character, systemically. Game code reads Player.CurrentPlayer / GameManager.Player;
+    /// the swap (TargetSwap) used to apply only to the second character's Update. Here it is extended to:
+    ///  - coroutines started on its object (end of a banana slide, action delays);
+    ///  - physics callbacks of any objects its collider entered (traps, shops, genie, mirror);
+    ///  - Update/FixedUpdate/LateUpdate of components on its object (dialogue window, held weapon, color, animation).
+    /// Does not work on the client: there the second character is a host puppet.
     /// </summary>
     internal static class OwnerContext
     {
         private static readonly Dictionary<long, bool> s_isSecond = new Dictionary<long, bool>();
 
-        /// <summary>Принадлежит ли компонент второму (неглавному) персонажу. Кэш по экземпляру и поколению игроков.</summary>
+        /// <summary>Whether the component belongs to the second (non-main) character. Cached per instance and player generation.</summary>
         public static GamePlayer SecondOwnerOf(Component c)
         {
             var p2 = CoopPlayers.P2;
@@ -34,7 +34,7 @@ namespace LuckyTowerCoop.Patches
             }
             try
             {
-                // окно выбора при открытии уходит под точку «иконки» NPC — по иерархии его не узнать, сверяем с окном второго игрока
+                // when opened, the choice window goes under the NPC "icon" point - it cannot be recognized by hierarchy, so compare with the second player's window
                 if (c is InteractionWindow win && p2.Components != null && p2.Components.InteractionWindow == win)
                 {
                     return p2;
@@ -54,12 +54,12 @@ namespace LuckyTowerCoop.Patches
             }
             catch (Exception)
             {
-                return null; // объект уничтожается (смена сцены) — подмена не нужна
+                return null; // object is being destroyed (scene change) - no swap needed
             }
         }
     }
 
-    /// <summary>Корутины второго персонажа выполняются под подменой «текущего игрока» на него.</summary>
+    /// <summary>Coroutines of the second character run under a swap of the "current player" to them.</summary>
     [HarmonyPatch(typeof(MonoBehaviour), nameof(MonoBehaviour.StartCoroutine), typeof(IEnumerator))]
     internal static class CoroutineContextPatch
     {
@@ -70,7 +70,7 @@ namespace LuckyTowerCoop.Patches
                 return;
             }
             var owner = OwnerContext.SecondOwnerOf(__instance);
-            // корутина на чужом объекте (банан, ловушка, магазин), запущенная пока «игрок» подменён на второго, — наследует подмену
+            // a coroutine on a foreign object (banana, trap, shop) started while the "player" was swapped to the second one inherits the swap
             if (owner == null && TargetSwap.InSwap && !NetSession.IsClient && CoopPlayers.P2 != null && GamePlayer.VonWansts[0] == CoopPlayers.P2)
             {
                 owner = CoopPlayers.P2;
@@ -97,7 +97,7 @@ namespace LuckyTowerCoop.Patches
 
         public bool MoveNext()
         {
-            // владелец стал главным (напарник погиб) — подмена больше не нужна
+            // the owner became the main player (partner died) - the swap is no longer needed
             if (m_owner == null || m_owner != CoopPlayers.P2)
             {
                 bool r0 = m_inner.MoveNext();
@@ -121,7 +121,7 @@ namespace LuckyTowerCoop.Patches
         public void Reset() => m_inner.Reset();
     }
 
-    /// <summary>Физические колбэки: если вошёл коллайдер второго персонажа — на время колбэка «игрок» = он.</summary>
+    /// <summary>Physics callbacks: if the second character's collider entered, the "player" = them for the duration of the callback.</summary>
     [HarmonyPatch]
     internal static class TriggerContextPatches
     {
@@ -174,7 +174,7 @@ namespace LuckyTowerCoop.Patches
         }
     }
 
-    /// <summary>Компоненты на объекте второго персонажа (окно диалога, оружие в руке, перекраска и т. п.): их Update — под подменой.</summary>
+    /// <summary>Components on the second character's object (dialogue window, held weapon, recoloring, etc.): their Update runs under the swap.</summary>
     [HarmonyPatch]
     internal static class ComponentContextPatches
     {
@@ -192,7 +192,7 @@ namespace LuckyTowerCoop.Patches
             {
                 if (!typeof(MonoBehaviour).IsAssignableFrom(t) || s_skip.Contains(t) || typeof(Trap).IsAssignableFrom(t) && !typeof(LuckyTower.Items.SpecialItem).IsAssignableFrom(t))
                 {
-                    continue; // ловушки к игроку не привязаны; предметы-ловушки (лампа, зелья) — да
+                    continue; // traps are not tied to the player; trap items (lamp, potions) are
                 }
                 foreach (var name in s_names)
                 {

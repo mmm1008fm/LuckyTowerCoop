@@ -6,14 +6,14 @@ using UnityEngine;
 namespace LuckyTowerCoop.Coop
 {
     /// <summary>
-    /// Сложность для двоих: множитель здоровья врагов и дополнительные копии обычных монстров.
-    /// Применяется один раз при первом входе в комнату (на хосте/в локальной игре; клиент онлайна получает результат по сети).
+    /// Two-player difficulty: enemy health multiplier and extra copies of regular monsters.
+    /// Applied once, on first entry to a room (on the host / in local play; the online client receives the result over the network).
     /// </summary>
     internal static class CoopDifficulty
     {
         private static readonly HashSet<int> s_processedRooms = new HashSet<int>();
         private static readonly Dictionary<GameObject, GameObject> s_cloneSource = new Dictionary<GameObject, GameObject>();
-        private static readonly System.Random s_rng = new System.Random(); // не трогаем UnityEngine.Random (генерация башни)
+        private static readonly System.Random s_rng = new System.Random(); // leave UnityEngine.Random alone (tower generation)
 
         public static bool TryGetCloneSource(GameObject clone, out GameObject source)
         {
@@ -47,7 +47,7 @@ namespace LuckyTowerCoop.Coop
                     Scale(e, hp);
                     scaled++;
                 }
-                // копируем только обычных монстров (у патрульных/особых врагов есть привязки к комнате)
+                // clone regular monsters only (patrol/special enemies have room bindings)
                 if (extra > 0f && e.GetType() == typeof(Enemy) && e.Stats.EnemyType == CharacterStats.EnemyTypes.Monster)
                 {
                     int copies = Mathf.FloorToInt(extra) + (s_rng.NextDouble() < extra - Mathf.Floor(extra) ? 1 : 0);
@@ -56,7 +56,7 @@ namespace LuckyTowerCoop.Coop
                         var offset = new Vector3((float)(s_rng.NextDouble() * 2.4 - 1.2), 0.2f, 0f);
                         var go = Object.Instantiate(e.gameObject, e.transform.position + offset, e.transform.rotation, e.transform.parent);
                         go.name = e.gameObject.name + "+";
-                        s_cloneSource[go] = e.gameObject; // здоровье копия уже унаследовала (оригинал масштабирован выше)
+                        s_cloneSource[go] = e.gameObject; // the clone already inherited the health (the original is scaled above)
                         Net.NetPaths.MarkRuntime(go);
                         cloned++;
                     }

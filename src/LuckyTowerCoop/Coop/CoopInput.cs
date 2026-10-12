@@ -5,11 +5,11 @@ using UnityEngine;
 namespace LuckyTowerCoop.Coop
 {
     /// <summary>
-    /// Ввод P2 через Rewired.
-    /// В игре настроен один Rewired-игрок, а InputManager инициализируется раньше BepInEx,
-    /// поэтому P2 получает системного игрока Rewired: он уже существует, игрой почти не используется,
-    /// и ему можно назначить геймпад и загрузить раскладки без пересоздания Rewired
-    /// (ResetAll сломал бы сохранённые игрой ссылки на Rewired.Player).
+    /// P2 input via Rewired.
+    /// The game has a single Rewired player configured, and InputManager initializes before BepInEx,
+    /// so P2 gets a Rewired system player: it already exists, the game barely uses it,
+    /// and it can be assigned a gamepad and loaded with layouts without recreating Rewired
+    /// (ResetAll would break the Rewired.Player references the game has saved).
     /// </summary>
     internal static class CoopInput
     {
@@ -58,7 +58,7 @@ namespace LuckyTowerCoop.Coop
                 AssignControllers();
             }
 
-            // Игра (менеджер раскладок, загрузка сохранённых раскладок) может убрать карты у системного игрока — восстанавливаем
+            // The game (layout manager, loading of saved layouts) may remove maps from the system player - restore them
             if (Time.unscaledTime >= s_nextMapCheck)
             {
                 s_nextMapCheck = Time.unscaledTime + 1f;
@@ -77,7 +77,7 @@ namespace LuckyTowerCoop.Coop
             }
             if (Net.NetSession.Role != Net.NetRole.None)
             {
-                // онлайн на одном ПК: игра может вернуть своему игроку «чужие» устройства — следим
+                // online on a single PC: the game may hand its own player "foreign" devices back - keep watching
                 if (Net.NetLaunch.Active && !OnlineDevicesOk())
                 {
                     s_dirty = true;
@@ -105,8 +105,8 @@ namespace LuckyTowerCoop.Coop
         public static void MarkDirty() => s_dirty = true;
 
         /// <summary>
-        /// Какие устройства нужны своему игроку в онлайне. Обычно — все. Две копии на одном ПК (--coop-device):
-        /// клавиатура и мышь — только у окна в фокусе; геймпад — у копии в режиме gamepad всегда, в режиме all — только в фокусе.
+        /// Which devices the local player needs online. Usually all of them. Two copies on one PC (--coop-device):
+        /// keyboard and mouse - only for the focused window; gamepad - always for the copy in gamepad mode, only when focused in all mode.
         /// </summary>
         private static void WantedOnline(out bool keyboard, out bool pads)
         {
@@ -144,7 +144,7 @@ namespace LuckyTowerCoop.Coop
             var joysticks = ReInput.controllers.Joysticks;
             if (Net.NetSession.Role != Net.NetRole.None)
             {
-                // онлайн: локальные устройства — своему игроку; второй персонаж на хосте управляется по сети.
+                // online: local devices go to the local player; the second character on the host is driven over the network.
                 WantedOnline(out bool keyboard, out bool pads);
                 foreach (var j in joysticks)
                 {
@@ -161,7 +161,7 @@ namespace LuckyTowerCoop.Coop
                 if (Net.NetLaunch.Active)
                 {
                     p1.controllers.hasMouse = keyboard;
-                    // Rewired без фокуса глушит и подмешанный сетевой ввод второго персонажа — фокус отслеживаем сами (см. выше)
+                    // Rewired mutes the mixed-in network input of the second character too when unfocused - we track focus ourselves (see above)
                     ReInput.configuration.ignoreInputWhenAppNotInFocus = false;
                 }
                 RemoveKeyboardMap(p2);
@@ -170,7 +170,7 @@ namespace LuckyTowerCoop.Coop
             }
             if (CoopConfig.P2Device.Value == P2DeviceMode.Gamepad)
             {
-                // P2 — последний подключённый геймпад, остальные — P1.
+                // P2 - the last connected gamepad, the rest - P1.
                 var p2Joy = joysticks.Count > 0 ? joysticks[joysticks.Count - 1] : null;
                 foreach (var j in joysticks)
                 {
@@ -208,7 +208,7 @@ namespace LuckyTowerCoop.Coop
             p.controllers.maps.SetMapsEnabled(true, ControllerType.Joystick, CategoryInGame);
         }
 
-        // Раскладка P2 для режима «оба с клавиатуры». P1 должен играть в схеме «клавиатура + мышь» (WASD).
+        // P2 layout for the "both on keyboard" mode. P1 must play with the "keyboard + mouse" scheme (WASD).
         private static readonly (int action, KeyCode key)[] s_p2Keys =
         {
             (2, KeyCode.LeftArrow), (23, KeyCode.RightArrow), (21, KeyCode.UpArrow), (22, KeyCode.DownArrow),
@@ -234,7 +234,7 @@ namespace LuckyTowerCoop.Coop
             }
             if (map == null)
             {
-                Plugin.Log.LogError("[Input] не удалось создать клавиатурную раскладку P2");
+                Plugin.Log.LogError("[Input] failed to create the P2 keyboard layout");
                 return;
             }
             map.ClearElementMaps();

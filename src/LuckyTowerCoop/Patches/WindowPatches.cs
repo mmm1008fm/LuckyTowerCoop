@@ -5,9 +5,9 @@ using UnityEngine;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Окно выбора (InteractionWindow: диалоги, магазин, банк, джинн, компаньоны) персонажа клиента живёт у хоста —
-    /// выбор делается по пересланному вводу. Клиенту хост пересылает «открылось/закрылось», тот показывает такое же окно у себя.
-    /// У клиента локальные открытия заглушены.
+    /// The choice window (InteractionWindow: dialogues, shop, bank, genie, companions) of the client's character lives on the host -
+    /// the choice is made via forwarded input. The host sends the client "opened/closed", and the client shows the same window locally.
+    /// Local openings are suppressed on the client.
     /// </summary>
     [HarmonyPatch(typeof(InteractionWindow))]
     internal static class WindowPatches

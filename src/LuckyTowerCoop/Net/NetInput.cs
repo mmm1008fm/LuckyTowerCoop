@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace LuckyTowerCoop.Net
 {
-    /// <summary>Действия, которые клиент пересылает хосту (геймплей; меню и UI остаются локальными).</summary>
+    /// <summary>Actions the client forwards to the host (gameplay; menus and UI stay local).</summary>
     internal static class NetInputMap
     {
         public static readonly int[] Actions = { 2, 23, 21, 22, 3, 6, 7, 8, 9, 10, 11, 13, 14, 15, 26 };
@@ -29,8 +29,8 @@ namespace LuckyTowerCoop.Net
     }
 
     /// <summary>
-    /// Клиент: опрашивает свои устройства (Rewired player 0) и шлёт хосту 60 раз/с:
-    /// маску зажатых кнопок + 4-битные счётчики нажатий (потеря пакета не теряет тап, повтор не удваивает).
+    /// Client: polls its own devices (Rewired player 0) and sends to the host 60 times/s:
+    /// a mask of held buttons + 4-bit press counters (a lost packet doesn't lose a tap, a resend doesn't double it).
     /// </summary>
     internal sealed class NetInputSender
     {
@@ -40,10 +40,10 @@ namespace LuckyTowerCoop.Net
         private ushort m_seq;
         private float m_next;
 
-        /// <summary>Сглаженное время «ввод отправлен → хост применил и прислал снапшот», мс (замер фазы 0).</summary>
+        /// <summary>Smoothed time "input sent -> host applied it and sent a snapshot", ms (phase 0 measurement).</summary>
         public float AppliedLagMs { get; private set; }
 
-        /// <summary>Номер последнего отправленного пакета ввода (для сверки предсказания).</summary>
+        /// <summary>Number of the last sent input packet (for checking the prediction).</summary>
         public ushort LastSentSeq => (ushort)(m_seq - 1);
 
         public void OnAck(ushort seq)
@@ -100,7 +100,7 @@ namespace LuckyTowerCoop.Net
         }
     }
 
-    /// <summary>Хост: ввод клиента как источник кнопок для Rewired-игрока второго персонажа.</summary>
+    /// <summary>Host: the client's input as the button source for the second character's Rewired player.</summary>
     internal sealed class NetInputSource : IButtonSource
     {
         private readonly byte[] m_lastCounters = new byte[NetInputMap.Actions.Length];
@@ -113,7 +113,7 @@ namespace LuckyTowerCoop.Net
         private uint m_prev;
         private int m_frame = -1;
 
-        /// <summary>Номер последнего применённого пакета ввода (хост возвращает в снапшоте — замер задержки у клиента).</summary>
+        /// <summary>Number of the last applied input packet (the host returns it in the snapshot - latency measurement on the client).</summary>
         public ushort LastSeq => m_lastSeq;
 
         public void OnPacket(NetDataReader r)
@@ -123,7 +123,7 @@ namespace LuckyTowerCoop.Net
             ulong counters = r.GetULong();
             if (m_hasPacket && (short)(seq - m_lastSeq) <= 0)
             {
-                return; // старый пакет
+                return; // old packet
             }
             for (int i = 0; i < m_lastCounters.Length; i++)
             {
@@ -156,7 +156,7 @@ namespace LuckyTowerCoop.Net
             m_prev = m_cur;
             if (Time.unscaledTime - m_lastPacketTime > 0.5f)
             {
-                m_held = 0; // пакеты не идут — отпускаем всё
+                m_held = 0; // no packets coming - release everything
             }
             m_cur = m_held | m_pulse;
             m_pulse = 0;

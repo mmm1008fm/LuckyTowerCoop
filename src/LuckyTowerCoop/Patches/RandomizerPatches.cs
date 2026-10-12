@@ -10,10 +10,10 @@ using UnityEngine;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Случайные декорации и ловушки (банки, табуреты, бомбы, монстры в окнах) игра выбирает общим генератором случайных
-    /// чисел при появлении объекта. Хост и клиент дёргают его в разном порядке, поэтому выбор расходится.
-    /// В онлайне перед решением каждого рандомайзера генераторы перезапускаются сидом, зависящим только от самого объекта
-    /// (имя комнаты + путь в ней + сид забега) — одинаковым на обеих машинах.
+    /// Random decorations and traps (jars, stools, bombs, monsters in windows) are chosen by the game with a shared random number generator
+    /// when the object appears. Host and client call it in a different order, so the choice diverges.
+    /// Online, before each randomizer decision the generators are restarted with a seed that depends only on the object itself
+    /// (room name + path within it + run seed) - identical on both machines.
     /// </summary>
     [HarmonyPatch]
     internal static class RandomizerPatches
@@ -23,8 +23,8 @@ namespace LuckyTowerCoop.Patches
             "EnableRandomObject", "LinkEnableRandomObjects", "SpriteRandomizer", "LuckyTower.Items.SpawnRandomObject", "SpawnRandomItem",
             "LuckyTower.CharacterSystem.MonsterRandomizer", "ColorRandomizer", "ScaleRandomizer", "TransformRandomizer", "randomRotation",
             "RandomAnimationSpeed", "PivotParallaxRandomizer", "CompanionRandomizer", "ChestSpawner",
-            "LuckyTower.RoomGeneration.BalconyGenerator", // внешняя стена башни: ряды окон, мусор, монстры — всё в Start()
-            "BalconyWindManager", // таймеры ветра (Awake)
+            "LuckyTower.RoomGeneration.BalconyGenerator", // tower exterior wall: window rows, trash, monsters - all in Start()
+            "BalconyWindManager", // wind timers (Awake)
         };
 
         private static readonly string[] s_entries = { "Awake", "Start", "OnEnable" };
@@ -69,7 +69,7 @@ namespace LuckyTowerCoop.Patches
             {
                 return;
             }
-            // состояние общих генераторов сохраняем: генерация башни (та же корутина, другие кадры) не должна зависеть от нас
+            // save the state of the shared generators: tower generation (the same coroutine, other frames) must not depend on us
             __state.Set = true;
             __state.Unity = UnityEngine.Random.state;
             __state.Global = s_threadAwareGlobal?.GetValue(null);

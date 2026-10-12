@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace LuckyTowerCoop.Patches
 {
-    /// <summary>Диагностика (dev): отпечаток генерации сегмента — вход (RNG, состояние игрока) и выход (список комнат) для сверки хост/клиент.</summary>
+    /// <summary>Diagnostics (dev): segment generation fingerprint - input (RNG, player state) and output (room list) for host/client comparison.</summary>
     [HarmonyPatch(typeof(RoomGenerator), nameof(RoomGenerator.GenerateSegmentFromConfig))]
     internal static class GenLogPatches
     {

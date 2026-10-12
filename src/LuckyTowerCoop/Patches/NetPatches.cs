@@ -8,15 +8,15 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Клиент-зеркало: собственная симуляция мира выключена — всё делает хост.
-    /// Разрешено только то, что применяет сеть (флаги NetClient.Applying*).
+    /// Mirror client: its own world simulation is disabled - the host does everything.
+    /// Only what the network applies is allowed (NetClient.Applying* flags).
     /// </summary>
     [HarmonyPatch]
     internal static class NetClientPatches
     {
         private static bool Mirror => NetSession.IsClient;
 
-        // --- персонажи и ИИ ---
+        // --- characters and AI ---
         [HarmonyPatch(typeof(GamePlayer), "Update")]
         [HarmonyPrefix]
         [HarmonyPriority(Priority.First)]
@@ -50,7 +50,7 @@ namespace LuckyTowerCoop.Patches
         [HarmonyPriority(Priority.First)]
         private static bool FlyingUpdate() => !Mirror;
 
-        // --- урон и смерть: только события хоста ---
+        // --- damage and death: host events only ---
         [HarmonyPatch(typeof(CharacterAction), nameof(CharacterAction.GetDamaged))]
         [HarmonyPrefix]
         [HarmonyPriority(Priority.First)]
@@ -66,13 +66,13 @@ namespace LuckyTowerCoop.Patches
         [HarmonyPriority(Priority.First)]
         private static bool ShowDeathUI() => !Mirror || NetClient.ApplyingGameOver;
 
-        // --- журнал лута: у клиента врагов создаёт сеть, без привязки к этажу — журнал ведёт хост ---
+        // --- loot journal: on the client, enemies are created by the network without floor binding, so the host keeps the journal ---
         [HarmonyPatch(typeof(LuckyTower.Items.LootLog), nameof(LuckyTower.Items.LootLog.AddLootableObjectToLootLog))]
         [HarmonyPrefix]
         [HarmonyPriority(Priority.First)]
         private static bool LootLog() => !Mirror;
 
-        // --- переходы: комнату переключает сообщение хоста ---
+        // --- transitions: the room is switched by a host message ---
         [HarmonyPatch(typeof(GameManager), nameof(GameManager.EnterDoor))]
         [HarmonyPrefix]
         [HarmonyPriority(Priority.First)]
@@ -98,7 +98,7 @@ namespace LuckyTowerCoop.Patches
         [HarmonyPriority(Priority.First)]
         private static bool SideTrigger() => !Mirror;
 
-        // --- сцены: грузит только сеть; выход в меню завершает сессию ---
+        // --- scenes: loaded by the network only; leaving to the main menu ends the session ---
         [HarmonyPatch(typeof(SceneLoader), nameof(SceneLoader.LoadSceneByName))]
         [HarmonyPrefix]
         [HarmonyPriority(Priority.First)]
@@ -110,13 +110,13 @@ namespace LuckyTowerCoop.Patches
             }
             if (loadScene == VillageManager.LoadScene.MainMenu)
             {
-                NetSession.Instance.Stop("клиент вышел в меню");
+                NetSession.Instance.Stop("client left to the main menu");
                 return true;
             }
             return false;
         }
 
-        // --- сейв клиента не трогаем ---
+        // --- leave the client's save alone ---
         [HarmonyPatch(typeof(GameData), nameof(GameData.Save))]
         [HarmonyPrefix]
         private static bool GameDataSave() => !Mirror;
@@ -133,7 +133,7 @@ namespace LuckyTowerCoop.Patches
         [HarmonyPrefix]
         private static bool LoadInventory() => !Mirror;
 
-        // --- тот же сид забега, что у хоста ---
+        // --- same run seed as the host ---
         private static readonly AccessTools.FieldRef<SegmentManager, bool> s_useSeed = AccessTools.FieldRefAccess<SegmentManager, bool>("m_useSeed");
         private static readonly AccessTools.FieldRef<SegmentManager, int> s_seed = AccessTools.FieldRefAccess<SegmentManager, int>("m_seed");
 
@@ -149,7 +149,7 @@ namespace LuckyTowerCoop.Patches
         }
     }
 
-    /// <summary>Хост: события, которые нужно отправить клиенту.</summary>
+    /// <summary>Host: events that must be sent to the client.</summary>
     [HarmonyPatch]
     internal static class NetHostPatches
     {

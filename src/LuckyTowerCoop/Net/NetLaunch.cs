@@ -7,17 +7,17 @@ using UnityEngine.SceneManagement;
 namespace LuckyTowerCoop.Net
 {
     /// <summary>
-    /// Онлайн на одном ПК: две копии игры через localhost, запуск с параметрами командной строки
+    /// Online on one PC: two game copies over localhost, launched with command-line parameters
     /// (tools\local-online.ps1):
-    ///   --coop-host                      сразу создать игру (Direct)
-    ///   --coop-join 127.0.0.1[:порт]     сразу подключиться (повторяет попытки, пока хост не поднимется)
-    ///   --coop-window left|right         окно в левой/правой половине основного монитора
-    ///   --coop-device auto|keyboard|gamepad|all   чем управляется эта копия (auto: хост — клавиатура, клиент — геймпад, если он есть)
-    ///   --coop-devserver                 включить отладочный сервер команд без правки конфига
-    ///   --coop-steam-host                сразу создать игру через Steam (лобби для друзей)
-    ///   --coop-steam-join [лобби]        сразу войти через Steam: в указанное лобби или в первое лобби друга, которое появится
-    ///                                    (тест на одном ПК: вторая копия со вторым аккаунтом Steam в песочнице, tools\steam-two.ps1)
-    /// В этом режиме игра не замирает без фокуса, а звук играет только у окна в фокусе.
+    ///   --coop-host                      create a game right away (Direct)
+    ///   --coop-join 127.0.0.1[:port]     connect right away (retries until the host is up)
+    ///   --coop-window left|right         window in the left/right half of the primary monitor
+    ///   --coop-device auto|keyboard|gamepad|all   which devices control this copy (auto: host - keyboard, client - gamepad if present)
+    ///   --coop-devserver                 enable the debug command server without editing the config
+    ///   --coop-steam-host                create a game via Steam right away (lobby for friends)
+    ///   --coop-steam-join [lobby]        join via Steam right away: the given lobby or the first friend lobby that appears
+    ///                                    (single-PC test: second copy with a second Steam account in a sandbox, tools\steam-two.ps1)
+    /// In this mode the game doesn't freeze without focus, and sound plays only for the focused window.
     /// </summary>
     internal sealed class NetLaunch : MonoBehaviour
     {
@@ -126,7 +126,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Какие устройства отдать своему игроку в онлайне (с учётом auto и наличия геймпадов).</summary>
+        /// <summary>Which devices to give your own player online (accounting for auto and gamepad availability).</summary>
         public static DeviceMode EffectiveDevice()
         {
             if (Device != DeviceMode.Auto)
@@ -150,7 +150,7 @@ namespace LuckyTowerCoop.Net
 
         private void OnApplicationFocus(bool focus)
         {
-            // две копии на одном ПК: слышно только окно в фокусе, клавиатура тоже у него
+            // two copies on one PC: only the focused window is audible, the keyboard also goes to it
             AudioListener.volume = focus ? 1f : 0f;
             Coop.CoopInput.MarkDirty();
         }
@@ -190,7 +190,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Клиент без кода лобби: ждём, пока у друга появится лобби коопа, и входим в первое.</summary>
+        /// <summary>Client without a lobby code: wait until a friend has a co-op lobby, then join the first one.</summary>
         private void PollFriendLobby()
         {
             var s = NetSession.Instance;
@@ -210,7 +210,7 @@ namespace LuckyTowerCoop.Net
             steam.RefreshFriends();
         }
 
-        // ================= окно =================
+        // ================= window =================
 
         private void UpdateWindow()
         {
@@ -225,15 +225,15 @@ namespace LuckyTowerCoop.Net
             m_nextCheck = Time.realtimeSinceStartup + 2f;
             if (m_title != null)
             {
-                UpdateTitle(); // геймпад могли подключить/отключить
+                UpdateTitle(); // a gamepad may have been plugged in/out
             }
             int sw = Display.main.systemWidth;
-            m_targetW = sw / 2 - 16; // рамка окна
+            m_targetW = sw / 2 - 16; // window frame
             m_targetH = m_targetW * 9 / 16;
             if (Screen.fullScreenMode != FullScreenMode.Windowed || Screen.width != m_targetW || Screen.height != m_targetH)
             {
                 Screen.SetResolution(m_targetW, m_targetH, FullScreenMode.Windowed);
-                m_moveInFrames = 5; // окно меняет размер не сразу
+                m_moveInFrames = 5; // the window doesn't resize immediately
             }
         }
 
@@ -255,14 +255,14 @@ namespace LuckyTowerCoop.Net
 
         private void UpdateTitle()
         {
-            string role = s_host ? "ХОСТ" : "КЛИЕНТ";
+            string role = s_host ? "HOST" : "CLIENT";
             string dev = EffectiveDevice() switch
             {
-                DeviceMode.Keyboard => "клавиатура",
-                DeviceMode.Gamepad => "геймпад",
-                _ => "ввод в окне с фокусом",
+                DeviceMode.Keyboard => "keyboard",
+                DeviceMode.Gamepad => "gamepad",
+                _ => "input in the focused window",
             };
-            string title = $"Lucky Tower Ultimate — {role} · {dev}";
+            string title = $"Lucky Tower Ultimate - {role} - {dev}";
             if (title == m_title)
             {
                 return;

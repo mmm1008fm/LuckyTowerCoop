@@ -6,14 +6,14 @@ using UnityEngine;
 
 namespace LuckyTowerCoop.Patches
 {
-    /// <summary>Ошибки игры, которые в коопе/онлайне срабатывают каждый кадр и забивают лог.</summary>
+    /// <summary>Game bugs that fire every frame in co-op/online and flood the log.</summary>
     [HarmonyPatch]
     internal static class GameFixPatches
     {
         private static readonly AccessTools.FieldRef<VisualIndicator, Transform> s_indicatorTarget =
             AccessTools.FieldRefAccess<VisualIndicator, Transform>("m_targetPos");
 
-        /// <summary>Указатель на бочку с порохом: бочка уже уничтожена (у клиента — по сети), а указатель обращается к ней каждый кадр.</summary>
+        /// <summary>Pointer to a powder keg: the keg is already destroyed (on the client - over the network), but the pointer touches it every frame.</summary>
         [HarmonyPatch(typeof(VisualIndicator), "Update")]
         [HarmonyPrefix]
         private static bool VisualIndicatorUpdate(VisualIndicator __instance)
@@ -26,22 +26,22 @@ namespace LuckyTowerCoop.Patches
             return false;
         }
 
-        /// <summary>Частицы, созданные вместе с объектом от хоста, ищут родителя, которого у клиента нет.</summary>
+        /// <summary>Particles created together with an object from the host look for a parent that the client does not have.</summary>
         [HarmonyPatch(typeof(PlayParticlesOnce), "Start")]
         [HarmonyFinalizer]
         private static Exception ParticlesStart(Exception __exception) => __exception is NullReferenceException ? null : __exception;
 
-        /// <summary>Летучая мышь, созданная по сети, при удалении лезет в менеджер боя, которого у клиента для неё нет.</summary>
+        /// <summary>A bat created over the network reaches into a combat manager on removal that the client does not have for it.</summary>
         [HarmonyPatch(typeof(BatBehaviour), "OnDisable")]
         [HarmonyFinalizer]
         private static Exception BatDisable(Exception __exception) => NetSession.IsClient && __exception is NullReferenceException ? null : __exception;
 
-        /// <summary>Подвесные декорации (цепи, ветки): у клиента их физика выключена, ограничитель угла каждый кадр падает на пустой связке.</summary>
+        /// <summary>Hanging decorations (chains, branches): their physics is off on the client, and the angle limiter fails every frame on an empty joint.</summary>
         [HarmonyPatch(typeof(AngleLimiter), "FixedUpdate")]
         [HarmonyPrefix]
         private static bool AngleLimiterFixedUpdate() => !NetSession.IsClient;
 
-        /// <summary>Проекция комнаты при смене камеры/сцены иногда обращается к ещё не готовой камере.</summary>
+        /// <summary>The room projection sometimes touches a camera that is not ready yet on camera/scene change.</summary>
         [HarmonyPatch(typeof(Room), "UpdateProjection")]
         [HarmonyFinalizer]
         private static Exception RoomProjection(Exception __exception) => __exception is NullReferenceException ? null : __exception;

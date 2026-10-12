@@ -4,9 +4,9 @@ namespace LuckyTowerCoop
 {
     public enum P2DeviceMode
     {
-        /// <summary>P1: клавиатура (+ остальные геймпады), P2: последний подключённый геймпад.</summary>
+        /// <summary>P1: keyboard (+ the other gamepads), P2: the last connected gamepad.</summary>
         Gamepad,
-        /// <summary>Оба с клавиатуры: P2 получает отдельную раскладку.</summary>
+        /// <summary>Both on keyboard: P2 gets a separate layout.</summary>
         Keyboard,
     }
 
@@ -40,7 +40,7 @@ namespace LuckyTowerCoop
 
         public static ConfigEntry<bool> DevServer;
 
-        /// <summary>Отладочный сервер: из конфига или параметром --coop-devserver.</summary>
+        /// <summary>Debug server: from the config or the --coop-devserver parameter.</summary>
         public static bool DevEnabled => DevServer.Value || LuckyTowerCoop.Net.NetLaunch.DevServer;
         public static ConfigEntry<int> DevPort;
         public static ConfigEntry<bool> DevForceWindowed;
@@ -48,36 +48,36 @@ namespace LuckyTowerCoop
 
         public static void Bind(ConfigFile cfg)
         {
-            Enabled = cfg.Bind("General", "Enabled", true, "Включить кооп.");
-            ShowNames = cfg.Bind("General", "ShowNames", true, "Подписи над персонажами (онлайн: «Вы» и имя напарника, локально: 1 и 2).");
+            Enabled = cfg.Bind("General", "Enabled", true, "Enable co-op.");
+            ShowNames = cfg.Bind("General", "ShowNames", true, "Name tags above characters (online: 'You' and the partner's name; local: 1 and 2).");
 
-            AutoSpawnP2 = cfg.Bind("Spawn", "AutoSpawnP2", true, "Автоматически создавать второго игрока в башне/деревне.");
-            SpawnInVillage = cfg.Bind("Spawn", "SpawnInVillage", true, "Создавать второго игрока и в деревне.");
-            SpawnDelay = cfg.Bind("Spawn", "SpawnDelaySeconds", 1.5f, "Задержка после загрузки сцены перед появлением P2.");
+            AutoSpawnP2 = cfg.Bind("Spawn", "AutoSpawnP2", true, "Automatically spawn the second player in the tower/village.");
+            SpawnInVillage = cfg.Bind("Spawn", "SpawnInVillage", true, "Also spawn the second player in the village.");
+            SpawnDelay = cfg.Bind("Spawn", "SpawnDelaySeconds", 1.5f, "Delay after the scene loads before P2 appears.");
 
-            P2Device = cfg.Bind("Input", "P2Device", P2DeviceMode.Gamepad, "Чем управляется второй игрок: Gamepad или Keyboard (оба с клавиатуры).");
+            P2Device = cfg.Bind("Input", "P2Device", P2DeviceMode.Gamepad, "What controls the second player: Gamepad or Keyboard (both on keyboard).");
 
-            LeashSeconds = cfg.Bind("Camera", "LeashSeconds", 3f, "Через сколько секунд за кадром P2 телепортируется к P1 (0 — выключено).");
+            LeashSeconds = cfg.Bind("Camera", "LeashSeconds", 3f, "Seconds off-screen before P2 is teleported to P1 (0 = disabled).");
 
-            KillsToRevive = cfg.Bind("Revive", "KillsToRevive", 5, new ConfigDescription("Сколько монстров должен убить живой игрок, чтобы воскресить напарника.", new AcceptableValueRange<int>(1, 100)));
-            ReviveOnNewFloor = cfg.Bind("Revive", "ReviveOnNewFloor", true, "Воскрешать напарника при переходе на новый этаж, даже если убийств не хватает.");
+            KillsToRevive = cfg.Bind("Revive", "KillsToRevive", 5, new ConfigDescription("How many monsters the living player must kill to revive their partner.", new AcceptableValueRange<int>(1, 100)));
+            ReviveOnNewFloor = cfg.Bind("Revive", "ReviveOnNewFloor", true, "Revive the partner on reaching a new floor even if the kill count isn't met.");
 
-            EnemyHealthMultiplier = cfg.Bind("Difficulty", "EnemyHealthMultiplier", 1f, new ConfigDescription("Множитель здоровья врагов (1 — как в игре, 2 — вдвое больше ударов).", new AcceptableValueRange<float>(0.25f, 10f)));
-            ExtraEnemies = cfg.Bind("Difficulty", "ExtraEnemies", 0f, new ConfigDescription("Сколько в среднем дополнительных копий у каждого обычного монстра (0 — выкл, 0.5 — +50%, 1 — вдвое больше).", new AcceptableValueRange<float>(0f, 3f)));
+            EnemyHealthMultiplier = cfg.Bind("Difficulty", "EnemyHealthMultiplier", 1f, new ConfigDescription("Enemy health multiplier (1 = vanilla, 2 = twice as many hits).", new AcceptableValueRange<float>(0.25f, 10f)));
+            ExtraEnemies = cfg.Bind("Difficulty", "ExtraEnemies", 0f, new ConfigDescription("Average number of extra copies of each regular monster (0 = off, 0.5 = +50%, 1 = twice as many).", new AcceptableValueRange<float>(0f, 3f)));
 
-            NetTransport = cfg.Bind("Net", "Transport", LuckyTowerCoop.Net.NetTransportKind.Steam, "Steam — через Spacewar (лобби друзей), Direct — по IP (LAN/Tailscale).");
-            NetPort = cfg.Bind("Net", "DirectPort", 27015, "UDP-порт хоста для Direct.");
-            NetJoinAddress = cfg.Bind("Net", "DirectJoinAddress", "127.0.0.1", "Последний адрес для подключения по Direct.");
-            NetPauseOnDisconnect = cfg.Bind("Net", "PauseOnDisconnect", true, "Хост ставит игру на паузу, пока напарник переподключается.");
-            NetReconnectSeconds = cfg.Bind("Net", "AutoContinueSeconds", 0f, "0 — ждать отключившегося напарника на паузе, пока хост сам не решит; >0 — через столько секунд снять паузу (вернуться он сможет всё равно).");
-            NetMenuKey = cfg.Bind("Net", "MenuKey", UnityEngine.KeyCode.F7, "Клавиша меню онлайна.");
-            NetInterp = cfg.Bind("Net", "InterpolationBuffer", true, "Клиент: показывать мир чуть в прошлом и вести его между снапшотами хоста по времени (плавно при неровной сети). Выключено — старое догоняние последнего снапшота.");
-            NetPredict = cfg.Bind("Net", "ClientPrediction", true, "Клиент: свой персонаж начинает идти сразу по нажатию, не дожидаясь ответа хоста (предсказание движения).");
+            NetTransport = cfg.Bind("Net", "Transport", LuckyTowerCoop.Net.NetTransportKind.Steam, "Steam: via Spacewar (friends' lobbies); Direct: by IP (LAN/Tailscale).");
+            NetPort = cfg.Bind("Net", "DirectPort", 27015, "Host UDP port for Direct.");
+            NetJoinAddress = cfg.Bind("Net", "DirectJoinAddress", "127.0.0.1", "Last address used to connect via Direct.");
+            NetPauseOnDisconnect = cfg.Bind("Net", "PauseOnDisconnect", true, "The host pauses the game while the partner reconnects.");
+            NetReconnectSeconds = cfg.Bind("Net", "AutoContinueSeconds", 0f, "0 = wait paused for the disconnected partner until the host decides; >0 = unpause after this many seconds (the partner can still rejoin).");
+            NetMenuKey = cfg.Bind("Net", "MenuKey", UnityEngine.KeyCode.F7, "Online menu key.");
+            NetInterp = cfg.Bind("Net", "InterpolationBuffer", true, "Client: show the world slightly in the past and move it between host snapshots over time (smooth on an uneven network). Off = legacy catch-up to the latest snapshot.");
+            NetPredict = cfg.Bind("Net", "ClientPrediction", true, "Client: your own character starts moving immediately on key press without waiting for the host (movement prediction).");
 
-            DevServer = cfg.Bind("Dev", "CommandServer", false, "UDP-сервер отладочных команд на 127.0.0.1 (для разработки).");
-            DevPort = cfg.Bind("Dev", "CommandPort", 47800, "Порт отладочного сервера.");
-            DevForceWindowed = cfg.Bind("Dev", "ForceWindowed", false, "Принудительно окно 1280x720 (для разработки).");
-            DevRunInBackground = cfg.Bind("Dev", "RunInBackground", false, "Не ставить игру на паузу без фокуса (для разработки).");
+            DevServer = cfg.Bind("Dev", "CommandServer", false, "UDP debug command server on 127.0.0.1 (for development).");
+            DevPort = cfg.Bind("Dev", "CommandPort", 47800, "Debug server port.");
+            DevForceWindowed = cfg.Bind("Dev", "ForceWindowed", false, "Force a 1280x720 window (for development).");
+            DevRunInBackground = cfg.Bind("Dev", "RunInBackground", false, "Don't pause the game when unfocused (for development).");
         }
     }
 }

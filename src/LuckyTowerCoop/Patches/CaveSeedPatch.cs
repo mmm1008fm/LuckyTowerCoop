@@ -9,8 +9,8 @@ using LuckyTower.RoomGeneration;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Пещеры после башни: игра перемешивает комнаты несидированным System.Random — у хоста и клиента получались разные пещеры.
-    /// Подменяем `new System.Random()` на `new System.Random(сид забега)`.
+    /// Caves after the tower: the game shuffles rooms with an unseeded System.Random, so host and client got different caves.
+    /// We replace `new System.Random()` with `new System.Random(run seed)`.
     /// </summary>
     [HarmonyPatch]
     internal static class CaveSeedPatch
@@ -30,7 +30,7 @@ namespace LuckyTowerCoop.Patches
                 if (ci.opcode == OpCodes.Newobj && ci.operand is ConstructorInfo c && c == s_ctorEmpty)
                 {
                     n++;
-                    // метки/блоки остаются на исходной инструкции — меняем её на месте
+                    // labels/blocks stay on the original instruction - replace it in place
                     ci.opcode = OpCodes.Call;
                     ci.operand = AccessTools.Method(typeof(CaveSeedPatch), nameof(Seed));
                     yield return ci;

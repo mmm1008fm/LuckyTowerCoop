@@ -6,26 +6,26 @@ using System.Globalization;
 namespace LuckyTowerCoop.Net
 {
     /// <summary>
-    /// Сетевая лаборатория: имитация плохого канала на приёме — задержка, разброс задержки (джиттер), потери, узкий канал.
-    /// Профиль ставится на обеих копиях (dev «net link wifi» или --coop-link wifi) — получается симметричный канал.
-    /// Работает для любого транспорта (Direct и Steam), потому что стоит на входе данных в игру.
-    /// Ненадёжные пакеты теряются и обгоняют друг друга, надёжные при «потере» ждут повтора и держат очередь за собой —
-    /// как в настоящем LiteNetLib/Steam.
+    /// Network lab: simulates a bad link on receive - latency, latency spread (jitter), loss, narrow bandwidth.
+    /// The profile is set on both copies (dev "net link wifi" or --coop-link wifi), giving a symmetric link.
+    /// Works for any transport (Direct and Steam), because it sits at the point where data enters the game.
+    /// Unreliable packets are lost and overtake each other; reliable ones, when "lost", wait for a resend and hold the queue behind them -
+    /// like real LiteNetLib/Steam.
     /// </summary>
     internal sealed class NetLinkSim
     {
         public struct Profile
         {
             public string Name;
-            public int LatencyMs;   // в одну сторону
-            public int JitterMs;    // верхняя граница случайной добавки (обычно маленькая, иногда всплеск)
+            public int LatencyMs;   // one way
+            public int JitterMs;    // upper bound of the random addition (usually small, occasionally a spike)
             public float LossPct;
-            public int KBps;        // ширина канала на приём, 0 — без ограничения
+            public int KBps;        // receive bandwidth, 0 = unlimited
 
             public bool Active => LatencyMs > 0 || JitterMs > 0 || LossPct > 0f || KBps > 0;
 
             public override string ToString() => !Active ? "off" :
-                string.Format(CultureInfo.InvariantCulture, "{0} ({1}±{2} мс, потери {3}%{4})", Name, LatencyMs, JitterMs, LossPct, KBps > 0 ? $", {KBps} кБ/с" : "");
+                string.Format(CultureInfo.InvariantCulture, "{0} ({1}+/-{2} ms, loss {3}%{4})", Name, LatencyMs, JitterMs, LossPct, KBps > 0 ? $", {KBps} KB/s" : "");
         }
 
         public static readonly Profile[] Presets =
@@ -38,7 +38,7 @@ namespace LuckyTowerCoop.Net
             new Profile { Name = "awful", LatencyMs = 160, JitterMs = 100, LossPct = 10f, KBps = 48 },
         };
 
-        /// <summary>Текущий профиль (один на процесс: в игре одна сессия).</summary>
+        /// <summary>Current profile (one per process: one session per game).</summary>
         public static Profile Current = Presets[0];
 
         public static int Dropped;
@@ -59,7 +59,7 @@ namespace LuckyTowerCoop.Net
 
         private static double Now => Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-        /// <summary>Принять входящий пакет в имитацию. false — имитация выключена, доставлять сразу.</summary>
+        /// <summary>Accept an incoming packet into the simulation. false - simulation is off, deliver immediately.</summary>
         public bool Intercept(byte[] data, int offset, int length, bool reliable)
         {
             var p = Current;
@@ -77,20 +77,20 @@ namespace LuckyTowerCoop.Net
             double delayMs = p.LatencyMs + JitterMs(p.JitterMs);
             if (lost)
             {
-                // надёжный потерялся: отправитель заметит и повторит примерно через круг
+                // a reliable packet was lost: the sender will notice and resend after about one round trip
                 Retransmitted++;
                 delayMs += 2 * p.LatencyMs + p.JitterMs + 20;
             }
             double due = now + delayMs / 1000.0;
             if (p.KBps > 0)
             {
-                // узкий канал: пакеты стоят в очереди на «проводе», задержка растёт при всплесках
+                // narrow link: packets queue on the "wire", delay grows during bursts
                 m_wireFree = Math.Max(m_wireFree, now) + length / (p.KBps * 1024.0);
                 due = Math.Max(due, m_wireFree + p.LatencyMs / 1000.0);
             }
             if (reliable)
             {
-                // надёжные строго по порядку: потерянный держит все следующие (блокировка очереди)
+                // reliable ones strictly in order: a lost one holds all following ones (queue blocking)
                 due = Math.Max(due, m_lastReliableDue);
                 m_lastReliableDue = due;
             }
@@ -100,7 +100,7 @@ namespace LuckyTowerCoop.Net
             return true;
         }
 
-        /// <summary>Отдать созревшие пакеты (вызывать каждый кадр из Poll транспорта).</summary>
+        /// <summary>Release matured packets (call every frame from the transport's Poll).</summary>
         public void Pump(Action<byte[], int, int> deliver)
         {
             if (m_q.Count == 0)
@@ -136,7 +136,7 @@ namespace LuckyTowerCoop.Net
             m_wireFree = 0;
         }
 
-        /// <summary>Джиттер как в жизни: чаще всего маленький, иногда всплеск до верхней границы.</summary>
+        /// <summary>Jitter as in real life: usually small, occasionally a spike up to the upper bound.</summary>
         private double JitterMs(int max)
         {
             if (max <= 0)
@@ -147,7 +147,7 @@ namespace LuckyTowerCoop.Net
             return Math.Min(1.0, -Math.Log(u) * 0.3) * max;
         }
 
-        /// <summary>«wifi» | «off» | «lat=80 jit=40 loss=3 bw=64». Возвращает описание.</summary>
+        /// <summary>"wifi" | "off" | "lat=80 jit=40 loss=3 bw=64". Returns a description.</summary>
         public static string Set(string spec)
         {
             spec = (spec ?? "").Trim().ToLowerInvariant();

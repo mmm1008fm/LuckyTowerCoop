@@ -9,7 +9,7 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 
 namespace LuckyTowerCoop.Patches
 {
-    /// <summary>Двери: нажатие «вверх» у двери проходит через голосование.</summary>
+    /// <summary>Doors: pressing "up" at a door goes through a vote.</summary>
     [HarmonyPatch(typeof(EnterDoorCommand), "DoorDownAction")]
     internal static class DoorDownActionPatch
     {
@@ -30,7 +30,7 @@ namespace LuckyTowerCoop.Patches
             {
                 return true;
             }
-            // Выбор двери как в оригинале (bubble-дверь в приоритете)
+            // Door choice as in the original (bubble door takes priority)
             var door = results[0].GetComponent<Door>();
             foreach (var r in results)
             {
@@ -44,7 +44,7 @@ namespace LuckyTowerCoop.Patches
         }
     }
 
-    /// <summary>Люк в следующий сегмент.</summary>
+    /// <summary>Hatch to the next segment.</summary>
     [HarmonyPatch(typeof(StartNewSegmentTrigger), "OnTriggerEnter2D")]
     internal static class StartNewSegmentTriggerPatch
     {
@@ -68,7 +68,7 @@ namespace LuckyTowerCoop.Patches
         }
     }
 
-    /// <summary>Боковой проход в соседнюю комнату.</summary>
+    /// <summary>Side passage to the adjacent room.</summary>
     [HarmonyPatch(typeof(EnterDoorSideTrigger), "OnTriggerEnter2D")]
     internal static class EnterDoorSideTriggerPatch
     {
@@ -85,7 +85,7 @@ namespace LuckyTowerCoop.Patches
             }
             var trigger = __instance;
             var room = GameManager.InstanceNoWarnings?.CurrentRoom;
-            // Отмена — шаг обратно, к центру текущей комнаты
+            // Cancel - a step back, toward the center of the current room
             var push = room != null ? new Vector3(Mathf.Sign(room.transform.position.x - trigger.transform.position.x) * 1.2f, 0f, 0f) : Vector3.zero;
             return CoopTransitions.OnTriggerTransition(player, trigger, trigger.transform.position + Vector3.up * 2.5f, canCancel: true, cancelPush: push,
                 commitAsP1: () => GameManager.Instance.EnterDoorSide(trigger.TargetRoom, trigger.TargetPosition));

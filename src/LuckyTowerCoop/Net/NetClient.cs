@@ -18,9 +18,9 @@ using Object = UnityEngine.Object;
 namespace LuckyTowerCoop.Net
 {
     /// <summary>
-    /// Клиент-зеркало: загружает сцену хоста с тем же сидом, ничего не симулирует сам,
-    /// все персонажи/враги/предметы повторяют снапшоты хоста. Свой ввод уходит хосту.
-    /// Свой персонаж (место B) — GameManager.Player, персонаж хоста (место A) — второй игрок.
+    /// Mirror client: loads the host's scene with the same seed, simulates nothing itself,
+    /// all characters/enemies/items follow host snapshots. Own input is sent to the host.
+    /// Own character (seat B) is GameManager.Player, the host's character (seat A) is the second player.
     /// </summary>
     public sealed class NetClient
     {
@@ -29,7 +29,7 @@ namespace LuckyTowerCoop.Net
         private readonly Dictionary<int, NetEntity> m_byId = new Dictionary<int, NetEntity>();
         private readonly NetEntity[] m_seatEntity = new NetEntity[2];
 
-        // буфер интерполяции: оценка времени хоста и задержка показа (подстраивается под джиттер сети)
+        // interpolation buffer: host time estimate and display delay (adapts to network jitter)
         private readonly NetClock m_clock = new NetClock();
         private float m_delaySeat = 0.05f;
         private float m_delayWorld = 0.08f;
@@ -52,8 +52,8 @@ namespace LuckyTowerCoop.Net
         private float m_unknownSince = -1f;
         private float m_lastResyncRequest = -10f;
 
-        /// <summary>Попросить хоста прислать комнату целиком (не чаще раза в 3 с).</summary>
-        /// <summary>Просьба к хосту начать заново (меню паузы клиента). Ответ приходит как обычная загрузка сцены.</summary>
+        /// <summary>Ask the host to resend the whole room (at most once per 3 s).</summary>
+        /// <summary>Ask the host to restart (client pause menu). The reply arrives as a normal scene load.</summary>
         public void RequestRestart()
         {
             var w = m_s.Begin(Msg.RestartRequest);
@@ -63,7 +63,7 @@ namespace LuckyTowerCoop.Net
             Plugin.Log.LogInfo("[NetClient] restart requested from host");
         }
 
-        /// <summary>Просьба хосту: передать напарнику (хосту) N монет моего персонажа.</summary>
+        /// <summary>Ask the host to give the partner (host) N coins from my character.</summary>
         public void RequestGiveCoins(int amount)
         {
             var w = m_s.Begin(Msg.GiveCoins);
@@ -72,7 +72,7 @@ namespace LuckyTowerCoop.Net
             Plugin.Log.LogInfo($"[NetClient] give coins requested: {amount}");
         }
 
-        /// <summary>Когда клиент последний раз просил рестарт (для подсказки на экране).</summary>
+        /// <summary>When the client last asked for a restart (for the on-screen hint).</summary>
         public float RestartRequestedAt { get; private set; } = -100f;
 
         public void RequestResync(string reason)
@@ -96,15 +96,15 @@ namespace LuckyTowerCoop.Net
         private PendingRoom m_pendingRoom;
         private bool m_ensuringSegments;
 
-        /// <summary>Сид забега хоста (для SegmentManager.ResetSeed).</summary>
+        /// <summary>Host run seed (for SegmentManager.ResetSeed).</summary>
         public static int RunSeed { get; private set; }
 
-        // флаги «это делает сеть» для патчей подавления
+        // "the network is doing this" flags for suppression patches
         public static bool ApplyingDeath;
         public static bool ApplyingScene;
         public static bool ApplyingGameOver;
 
-        // интерфейс хоста
+        // host interface
         public static readonly List<(Vector3 pos, string text)> HostLabels = new List<(Vector3, string)>();
         public static int ReviveKills = -1;
         public static int ReviveNeed;
@@ -129,7 +129,7 @@ namespace LuckyTowerCoop.Net
 
         private static GamePlayer SeatPuppet(Seat seat) => seat == Seat.B ? CoopPlayers.P1 : CoopPlayers.P2;
 
-        // ================= сессия =================
+        // ================= session =================
 
         internal void WriteHelloState(NetDataWriter w)
         {
@@ -169,7 +169,7 @@ namespace LuckyTowerCoop.Net
             ReviveKills = -1;
             RunSeed = 0;
             CoopInput.MarkDirty();
-            // мир клиента — марионетки без хоста; возвращаемся в меню
+            // the client world is puppets without a host; return to the menu
             if (SceneManager.GetActiveScene().name != "MainMenu")
             {
                 ApplyingScene = true;
@@ -184,7 +184,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= сообщения =================
+        // ================= messages =================
 
         internal void OnMessage(Msg type, NetDataReader r)
         {
@@ -241,9 +241,9 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= окно выбора =================
+        // ================= selection window =================
 
-        /// <summary>Окно открывается по команде хоста (локально у клиента окна не открываются: выбор делает хост по пересланному вводу).</summary>
+        /// <summary>The window opens on the host's command (windows never open locally on the client: the host makes the choice from forwarded input).</summary>
         internal static bool ApplyingWindow;
 
         private Transform m_windowAnchor;
@@ -251,7 +251,7 @@ namespace LuckyTowerCoop.Net
         private void OnWindow(NetDataReader r)
         {
             bool open = r.GetBool();
-            var own = CoopPlayers.P1; // свой персонаж (у клиента место B — главный)
+            var own = CoopPlayers.P1; // own character (on the client, seat B is the main one)
             if (own == null || own.Components == null || own.Components.InteractionWindow == null)
             {
                 if (open)
@@ -292,7 +292,7 @@ namespace LuckyTowerCoop.Net
                 }
                 if (target == null && tpos != Vector3.zero)
                 {
-                    // объект хоста у нас не найден — ставим окно в ту же точку мира
+                    // host object not found here - put the window at the same world point
                     if (m_windowAnchor == null)
                     {
                         m_windowAnchor = new GameObject("CoopWindowAnchor").transform;
@@ -314,9 +314,9 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= свет =================
+        // ================= light =================
 
-        /// <summary>Применяется состояние «свет погас» от хоста (локальные вызовы ловушки на клиенте заглушены).</summary>
+        /// <summary>Applies the host's "lights out" state (local trap calls on the client are muted).</summary>
         internal static bool ApplyingLights;
 
         private static readonly System.Reflection.MethodInfo s_lightsOut = AccessTools.Method(typeof(LuckyTower.Traps.TrapLightsOut), "LightsOut");
@@ -324,9 +324,9 @@ namespace LuckyTowerCoop.Net
         private static readonly System.Reflection.MethodInfo s_lightsInitialize = AccessTools.Method(typeof(LuckyTower.Traps.TrapLightsOut), "Initialize");
         private static readonly AccessTools.FieldRef<LuckyTower.Traps.TrapLightsOut, bool> s_lightsInit = AccessTools.FieldRefAccess<LuckyTower.Traps.TrapLightsOut, bool>("m_initialized");
 
-        // ================= взрыв башни =================
+        // ================= tower explosion =================
 
-        /// <summary>Идёт ролик взрыва башни от хоста: локальный DestroyTower у клиента не запускается, ролик показывает сам клиент.</summary>
+        /// <summary>The host's tower explosion cutscene is playing: the client's local DestroyTower is not started, the client plays the cutscene itself.</summary>
         internal static bool TowerExploding { get; private set; }
 
         private void OnTowerExplosion()
@@ -350,7 +350,7 @@ namespace LuckyTowerCoop.Net
             TowerExploding = true;
             try
             {
-                // персонажи не двигаются, пока идёт ролик (как у хоста)
+                // characters don't move while the cutscene plays (as on the host)
                 foreach (var p in new[] { CoopPlayers.P1, CoopPlayers.P2 })
                 {
                     if (p != null && p.Stats != null)
@@ -361,7 +361,7 @@ namespace LuckyTowerCoop.Net
                 }
                 try
                 {
-                    // звук как у хоста: музыка и звуки башни глохнут
+                    // sound as on the host: music and tower sounds are muted
                     gm.MasterMixer.GetFloat("SounddesignVolume", out var vol);
                     PlayerPrefs.SetFloat("soundDesignVolume", vol);
                     AudioManager.Instance.StopMusic();
@@ -418,7 +418,7 @@ namespace LuckyTowerCoop.Net
             ApplyingLights = true;
             try
             {
-                // у клиента триггер ловушки заглушен, поэтому её Initialize (список светильников, плоскость темноты) зовём сами
+                // the trap trigger is muted on the client, so we call its Initialize (lamp list, darkness plane) ourselves
                 if (!s_lightsInit(trap))
                 {
                     s_lightsInitialize?.Invoke(trap, null);
@@ -442,7 +442,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= видимость частей персонажей =================
+        // ================= character part visibility =================
 
         private readonly byte[][] m_look = new byte[2][];
         private readonly int[] m_lookBad = new int[2];
@@ -465,13 +465,13 @@ namespace LuckyTowerCoop.Net
             var puppet = SeatPuppet((Seat)i);
             if (puppet == null || m_look[i] == null || CoopVisibility.IsHidden(puppet))
             {
-                return; // спрятан у двери — применим, когда покажется
+                return; // hidden at the door - apply when it shows up
             }
             m_lookReader.SetSource(m_look[i]);
             int changed = NetLook.Apply(puppet, m_lookReader);
             var anim = puppet.Components.Animator != null ? puppet.Components.Animator.AnimatorComponent : null;
-            // сильно разошлось (застрял «вид со спины»): аниматор запомнил неверный исходный вид и каждый кадр его возвращает —
-            // выставив части как у хоста, заставляем его запомнить исходный вид заново (не во время входа в дверь)
+            // diverged a lot (stuck in "back view"): the animator remembered a wrong default look and restores it every frame -
+            // setting the parts like the host's makes it remember the default look again (not during door entry)
             m_lookBad[i] = changed >= 12 ? m_lookBad[i] + 1 : 0;
             if (m_lookBad[i] >= 2 && anim != null && anim.isActiveAndEnabled && !anim.GetBool(s_enterDoorParam))
             {
@@ -479,11 +479,11 @@ namespace LuckyTowerCoop.Net
                 anim.Rebind();
                 m_lookReader.SetSource(m_look[i]);
                 NetLook.Apply(puppet, m_lookReader);
-                Plugin.Log.LogInfo($"[NetClient] seat {(Seat)i}: {changed} parts differed from host — animator defaults rebound");
+                Plugin.Log.LogInfo($"[NetClient] seat {(Seat)i}: {changed} parts differed from host - animator defaults rebound");
             }
         }
 
-        // ================= предметы в руках =================
+        // ================= held items =================
 
         private void OnAttach(NetDataReader r)
         {
@@ -509,7 +509,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Прикрепить предмет к той же кости марионетки, что у хоста (false — марионетки ещё нет, повторим).</summary>
+        /// <summary>Attach the item to the same puppet bone as on the host (false - no puppet yet, will retry).</summary>
         private bool TryAttach(NetEntity e)
         {
             if (!e.AttachPending || !e.Alive)
@@ -562,9 +562,9 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= реплики =================
+        // ================= voice lines =================
 
-        /// <summary>Проигрывается реплика, присланная хостом (остальные на клиенте заглушены).</summary>
+        /// <summary>Plays a line sent by the host (the others on the client are muted).</summary>
         internal static bool ApplyingTalk;
 
         private static readonly System.Reflection.MethodInfo s_talkRoutine = AccessTools.Method(typeof(DialogueManager), "TalkRoutine");
@@ -679,7 +679,7 @@ namespace LuckyTowerCoop.Net
                     var hostVillage = MessagePack.MessagePackSerializer.Deserialize<VillageData>(village);
                     if (s_ownVillage == null)
                     {
-                        s_ownVillage = dm.VillageData; // своя деревня вернётся после сессии (сейв клиента не пишется)
+                        s_ownVillage = dm.VillageData; // own village comes back after the session (client save is not written)
                     }
                     dm.VillageData = hostVillage;
                 }
@@ -732,7 +732,7 @@ namespace LuckyTowerCoop.Net
             m_s.Send(w, Delivery.Reliable);
         }
 
-        // ================= комната =================
+        // ================= room =================
 
         private void OnRoomEnter(NetDataReader r)
         {
@@ -759,12 +759,12 @@ namespace LuckyTowerCoop.Net
             {
                 p.Inactive.Add(r.GetInt());
             }
-            // полная (пере)синхронизация: объекты, которые клиент создавал сам, будут пересозданы по регистрации
+            // full (re)sync: objects the client created itself will be recreated from registration
             foreach (var e in m_byId.Values)
             {
                 if ((e.SpawnedByNet || e.Attached) && e.Alive)
                 {
-                    Object.Destroy(e.Go); // предметы в руках хост пришлёт заново и они снова прикрепятся
+                    Object.Destroy(e.Go); // held items will be resent by the host and reattach
                 }
             }
             m_byId.Clear();
@@ -773,7 +773,7 @@ namespace LuckyTowerCoop.Net
             m_pendingRegs.Clear();
             m_unknownSince = -1f;
 
-            // сразу после перезапуска забега GameManager новой сцены может ещё не существовать — применим комнату в Tick
+            // right after a run restart the new scene's GameManager may not exist yet - apply the room in Tick
             if (!CoopPlayers.IsInitialized(GameManager.InstanceNoWarnings))
             {
                 m_pendingRoom = p;
@@ -794,7 +794,7 @@ namespace LuckyTowerCoop.Net
 
         private static readonly Dictionary<string, GameObject> s_prefabs = new Dictionary<string, GameObject>();
 
-        /// <summary>Префаб (ассет, не объект сцены) по имени: враги/мыши, которых спавнеры создают во время игры.</summary>
+        /// <summary>Prefab (asset, not a scene object) by name: enemies/mice that spawners create during play.</summary>
         private static GameObject FindPrefab(string name)
         {
             if (s_prefabs.TryGetValue(name, out var cached))
@@ -811,7 +811,7 @@ namespace LuckyTowerCoop.Net
                     break;
                 }
             }
-            s_prefabs[name] = found; // промах тоже запоминаем: поиск по всем ассетам дорогой
+            s_prefabs[name] = found; // remember misses too: searching all assets is expensive
             return found;
         }
 
@@ -838,7 +838,7 @@ namespace LuckyTowerCoop.Net
             return go;
         }
 
-        /// <summary>Персонаж, впервые увиденный хостом в комнате «имя|путь» (спутник мог уйти оттуда за игроком).</summary>
+        /// <summary>Character first seen by the host in room "name|path" (a companion may have followed the player out of there).</summary>
         private static GameObject FindByOrigin(string key)
         {
             if (s_originGo.TryGetValue(key, out var go) && go != null)
@@ -857,8 +857,8 @@ namespace LuckyTowerCoop.Net
         }
 
         /// <summary>
-        /// Комната по имени. Имена в пещерах повторяются между кластерами («Cave 6» ×3) — тогда выбираем по номеру сегмента хоста
-        /// (иначе клиент вставал в комнату другого кластера: «Cave» хост=32 объекта, клиент=15).
+        /// Room by name. Names repeat across clusters in caves ("Cave 6" x3) - then pick by the host's segment number
+        /// (otherwise the client entered a room from another cluster: "Cave" host=32 objects, client=15).
         /// </summary>
         private static Room FindRoom(string name, int segment = int.MinValue)
         {
@@ -881,7 +881,7 @@ namespace LuckyTowerCoop.Net
             return first;
         }
 
-        /// <summary>Подключение посреди забега: догенерировать сегменты до комнаты хоста (тот же сид).</summary>
+        /// <summary>Joining mid-run: generate segments up to the host's room (same seed).</summary>
         private IEnumerator EnsureSegments(int targetSegment)
         {
             m_ensuringSegments = true;
@@ -894,7 +894,7 @@ namespace LuckyTowerCoop.Net
                 }
                 bool done = false;
                 Plugin.Log.LogInfo($"[NetClient] generating segment {seg} to reach {m_pendingRoom.Name}");
-                // у хоста сегмент N создаётся, когда игрок входит в выходную комнату сегмента N−1 (SegmentID = N−1)
+                // on the host, segment N is created when the player enters the exit room of segment N-1 (SegmentID = N-1)
                 if (seg >= 2)
                 {
                     SyncPlayerSegment(GameManager.InstanceNoWarnings, seg - 1);
@@ -917,16 +917,16 @@ namespace LuckyTowerCoop.Net
                 }
                 else
                 {
-                    Plugin.Log.LogError($"[NetClient] room {m_pendingRoom.Name} not found — generation differs from host");
+                    Plugin.Log.LogError($"[NetClient] room {m_pendingRoom.Name} not found - generation differs from host");
                 }
                 m_pendingRoom = null;
             }
         }
 
         /// <summary>
-        /// Генерация сегмента читает Player.Stats.SegmentID (имена комнат «S0N_…», тип пола, списки комнат для телепорта),
-        /// а игра выставляет его только при проходе через дверь. Клиент входит в комнаты по сообщению хоста — без этого его
-        /// значение отставало, и сегмент 3 получал другие имена комнат («S02_…» вместо «S03_…» → «комната не найдена»).
+        /// Segment generation reads Player.Stats.SegmentID (room names "S0N_...", floor type, room lists for teleport),
+        /// and the game sets it only when passing through a door. The client enters rooms on host messages - without this its
+        /// value lagged, and segment 3 got different room names ("S02_..." instead of "S03_..." -> "room not found").
         /// </summary>
         private static void SyncPlayerSegment(GameManager gm, int segmentId)
         {
@@ -1020,7 +1020,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= сущности =================
+        // ================= entities =================
 
         private sealed class Pending
         {
@@ -1038,8 +1038,8 @@ namespace LuckyTowerCoop.Net
 
         internal int m_registerBatches;
 
-        // Эвелиус в хабе: у клиента его Start не выполняется (не самоуничтожается по положению марионетки),
-        // поэтому через пару секунд после входа сверяем с хостом — если хост его не зарегистрировал, у хоста его нет
+        // Evelius in the hub: his Start doesn't run on the client (he doesn't self-destroy based on the puppet position),
+        // so a couple of seconds after entering we check with the host - if the host didn't register him, the host doesn't have him
         private float m_eveliusCheckAt = -1f;
 
         private void CheckOrphanEvelius(Room room)
@@ -1062,7 +1062,7 @@ namespace LuckyTowerCoop.Net
                 }
                 if (!known)
                 {
-                    Plugin.Log.LogInfo($"[NetClient] Evelius {ev.name}: not registered by host — removing here too");
+                    Plugin.Log.LogInfo($"[NetClient] Evelius {ev.name}: not registered by host - removing here too");
                     Object.Destroy(ev.gameObject);
                 }
             }
@@ -1098,7 +1098,7 @@ namespace LuckyTowerCoop.Net
                     }
                     if (path.Length > 0)
                     {
-                        // игра могла ещё не создать этот объект (платформа дверей в хабе) — повторим несколько секунд
+                        // the game may not have created this object yet (hub door platform) - retry for a few seconds
                         m_pendingRegs[id] = new Pending { Id = id, Kind = kind, Path = path, ItemName = itemName, Pos = pos, Active = active, Until = Time.unscaledTime + 8f };
                     }
                 }
@@ -1149,7 +1149,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Найти/создать объект для записи хоста и сделать его марионеткой. false — объекта нет (пока).</summary>
+        /// <summary>Find/create the object for a host record and make it a puppet. false - no object (yet).</summary>
         private bool TryRegister(GameManager gm, Room room, int id, EntityKind kind, string path, string itemName, Vector3 pos, bool active)
         {
             {
@@ -1162,7 +1162,7 @@ namespace LuckyTowerCoop.Net
                     go = t != null ? t.gameObject : null;
                     if (go != null && kind == EntityKind.Character && !s_originGo.ContainsKey(room.name + "|" + path))
                     {
-                        s_originGo[room.name + "|" + path] = go; // если персонаж потом уйдёт за игроком в другую комнату
+                        s_originGo[room.name + "|" + path] = go; // in case the character later follows the player into another room
                     }
                 }
                 if (go == null && itemName.StartsWith("#origin:"))
@@ -1187,7 +1187,7 @@ namespace LuckyTowerCoop.Net
                     if (s_corpseByTag.TryGetValue(corpseTag, out go) && go != null)
                     {
                         s_corpseMapped.Add(go);
-                        FreezeBody(go, go.transform.position); // положение трупа дальше ведёт хост
+                        FreezeBody(go, go.transform.position); // the corpse position is driven by the host from here on
                     }
                 }
                 if (go == null && kind == EntityKind.Item && itemName.Length > 0 && !itemName.StartsWith("#") && ItemCatalog.Has(gm.ItemLibrary, itemName))
@@ -1202,7 +1202,7 @@ namespace LuckyTowerCoop.Net
                 }
                 if (go == null && path.Length > 0 && (kind == EntityKind.Character || kind == EntityKind.Other))
                 {
-                    // создан у хоста во время игры (спавнер, призыв): у нас его нет — создаём из того же префаба
+                    // created on the host during play (spawner, summon): we don't have it - create from the same prefab
                     go = SpawnFromPrefab(room, path, pos);
                     spawned = go != null;
                 }
@@ -1233,8 +1233,8 @@ namespace LuckyTowerCoop.Net
             {
                 e.Rb.simulated = false;
             }
-            // события анимации дёргают логику (урон, смерть, бросок мусора из окна со своим рандомом) — у марионеток глушим;
-            // всё, что хост создаёт по событиям, приходит регистрацией
+            // animation events trigger logic (damage, death, trash thrown out of the window with its own random) - muted on puppets;
+            // everything the host creates from events arrives via registration
             if (e.Anim != null)
             {
                 e.Anim.fireEvents = false;
@@ -1243,7 +1243,7 @@ namespace LuckyTowerCoop.Net
 
         private static readonly AccessTools.FieldRef<CharacterStats, int> s_healthField = AccessTools.FieldRefAccess<CharacterStats, int>("health");
 
-        /// <summary>Урон по врагу виден у клиента: здоровье ставим напрямую (без событий) и зовём штатную перекраску.</summary>
+        /// <summary>Damage to an enemy is visible on the client: set health directly (no events) and call the standard recolor.</summary>
         private static void ApplyHealthVisual(NetEntity e, byte hp)
         {
             var c = e.Character;
@@ -1279,8 +1279,8 @@ namespace LuckyTowerCoop.Net
                 e = NetEntity.For(seat == Seat.A ? NetPaths.SeatA : NetPaths.SeatB, puppet.gameObject, EntityKind.Seat);
                 if (e.Anim != null)
                 {
-                    // хост на время дверей прячет графику; выключаясь посреди анимации «вид со спины», аниматор оставлял бы
-                    // её значения как исходные — персонаж навсегда «лысый и голый». При выключении возвращаем исходный вид.
+                    // the host hides graphics during doors; if disabled mid "back view" animation, the animator would keep
+                    // its values as defaults - the character would stay "bald and naked" forever. On disable, restore the default look.
                     e.Anim.writeDefaultValuesOnDisable = true;
                 }
                 e.TargetPos = puppet.transform.position;
@@ -1292,7 +1292,7 @@ namespace LuckyTowerCoop.Net
 
         private void OnSnapshot(NetDataReader r)
         {
-            float hostTime = r.GetFloat(); // время хоста (реальное): по нему буфер интерполяции
+            float hostTime = r.GetFloat(); // host time (real): the interpolation buffer runs on it
             m_clock.OnSample(hostTime);
             bool seatPacket = false;
             int layer = r.GetInt();
@@ -1347,7 +1347,7 @@ namespace LuckyTowerCoop.Net
                     {
                         e.Go.SetActive(attachedActive);
                     }
-                    continue; // висит на кости марионетки
+                    continue; // hangs on a puppet bone
                 }
                 e.TargetPos = new Vector3(x, y, e.T.position.z);
                 e.TargetRot = rot;
@@ -1384,7 +1384,7 @@ namespace LuckyTowerCoop.Net
                 bool active = (flags & 2) != 0;
                 if (e.Kind == EntityKind.Seat)
                 {
-                    // персонаж ждёт у двери (у хоста спрятан) — прячем графику и здесь
+                    // the character waits at the door (hidden on the host) - hide graphics here too
                     if (e.Character != null && CoopVisibility.IsHidden(e.Character) == active)
                     {
                         CoopVisibility.SetHidden(e.Character, !active);
@@ -1399,7 +1399,7 @@ namespace LuckyTowerCoop.Net
                     e.Go.SetActive(active);
                 }
             }
-            // хост шлёт объекты, о которых мы не знаем (потерялась регистрация) — дольше 1.5 с просим комнату целиком
+            // host sends objects we don't know about (registration lost) - after 1.5 s ask for the whole room
             if (!unknown || m_awaitingScene || m_pendingRoom != null)
             {
                 m_unknownSince = -1f;
@@ -1435,11 +1435,11 @@ namespace LuckyTowerCoop.Net
             KillPuppet(c, tag);
         }
 
-        /// <summary>Смерть марионетки по событию хоста; тело остаётся на месте (физики у марионеток нет).</summary>
+        /// <summary>Puppet death on a host event; the body stays in place (puppets have no physics).</summary>
         internal static void KillPuppet(Character c, int hostTag = 0)
         {
             var pos = c.transform.position;
-            // труп игра собирает событием анимации и физикой — на время смерти возвращаем их марионетке
+            // the game assembles the corpse via an animation event and physics - restore them to the puppet for the duration of death
             var anim = c.Components.Animator != null ? c.Components.Animator.AnimatorComponent : null;
             if (anim != null)
             {
@@ -1469,7 +1469,7 @@ namespace LuckyTowerCoop.Net
             NetSession.Instance.StartCoroutine(CorpseWatch(c.gameObject, pos));
         }
 
-        /// <summary>Если тело провалилось сквозь пол — возвращаем на место смерти и замораживаем.</summary>
+        /// <summary>If the body fell through the floor - return it to the death spot and freeze it.</summary>
         private static IEnumerator CorpseWatch(GameObject go, Vector3 pos)
         {
             float t = 0f;
@@ -1480,7 +1480,7 @@ namespace LuckyTowerCoop.Net
             }
             if (go != null && !s_corpseMapped.Contains(go) && go.transform.position.y < pos.y - 3f)
             {
-                Plugin.Log.LogInfo($"[NetClient] corpse {go.name} fell through — restoring");
+                Plugin.Log.LogInfo($"[NetClient] corpse {go.name} fell through - restoring");
                 FreezeBody(go, pos);
             }
         }
@@ -1516,9 +1516,9 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= игроки =================
+        // ================= players =================
 
-        /// <summary>Марионетки обоих мест: свой персонаж — GameManager.Player, персонаж хоста — второй.</summary>
+        /// <summary>Puppets for both seats: own character is GameManager.Player, the host's character is the second.</summary>
         private void EnsureSeatPuppets(Vector3? hostPos)
         {
             var main = CoopPlayers.P1;
@@ -1534,7 +1534,7 @@ namespace LuckyTowerCoop.Net
                 }
                 if (p.Stats.InputAllowed)
                 {
-                    p.Stats.InputAllowed = false; // игра пишет стек вызовов на каждый вызов сеттера — только при смене
+                    p.Stats.InputAllowed = false; // the game records a call stack on every setter call - only on change
                 }
                 if (p.Components.Rigidbody != null && p.Components.Rigidbody.simulated && !p.Stats.Dead)
                 {
@@ -1573,8 +1573,8 @@ namespace LuckyTowerCoop.Net
             CoopGold.SeatTotals[i] = r.GetInt();
 
             var puppet = SeatPuppet(seat);
-            // у хоста персонаж этого места сменился (воскрешение, возвращение после обрыва):
-            // прежний у нас становится трупом, для живого нового — новая марионетка
+            // the seat's character changed on the host (respawn, return after a drop):
+            // the old one becomes a corpse here, a new puppet is made for the living new one
             if (m_seatKnown[i] && tag != m_seatTag[i])
             {
                 if (puppet != null && !puppet.Stats.Dead)
@@ -1594,7 +1594,7 @@ namespace LuckyTowerCoop.Net
                 return;
             }
 
-            // ХП (зубы): дырки в улыбке как у хоста
+            // HP (teeth): gaps in the smile as on the host
             string teethKey = string.Join(",", teeth.Select(t => $"{(int)t.Color}:{t.Position}:{t.CurrentHits}"));
             if (teethKey != m_seatTeeth[i])
             {
@@ -1615,8 +1615,8 @@ namespace LuckyTowerCoop.Net
             {
                 return;
             }
-            // первая установка (новая марионетка): облик применяем принудительно — у клона шаблона броня «числится»,
-            // но анимации волос/трусов не подключены, и персонаж выглядит лысым и голым
+            // first apply (new puppet): force the look - the template clone has armor "listed",
+            // but hair/underwear animations aren't hooked up, and the character looks bald and naked
             bool first = m_seatVisual[i] == null;
             m_seatVisual[i] = visual;
             try
@@ -1652,7 +1652,7 @@ namespace LuckyTowerCoop.Net
 
         private GamePlayer RespawnPuppet(Seat seat, Vector3 pos, LocaDatabase.Characters form = LocaDatabase.Characters.Wanst)
         {
-            Plugin.Log.LogInfo($"[NetClient] seat {seat} respawned on host — new puppet");
+            Plugin.Log.LogInfo($"[NetClient] seat {seat} respawned on host - new puppet");
             if (seat == Seat.A)
             {
                 CoopPlayers.DetachSecondAsCorpse();
@@ -1660,7 +1660,7 @@ namespace LuckyTowerCoop.Net
                 EnsureSeatPuppets(null);
                 return p;
             }
-            // своё место: новый персонаж становится главным, а персонаж хоста остаётся вторым
+            // own seat: the new character becomes the main one, and the host's character stays the second
             var hostPuppet = CoopPlayers.P2;
             CoopPlayers.DetachSecondAsCorpse();
             var mine = CoopPlayers.SpawnP2(pos, PrefabForForm(form));
@@ -1679,7 +1679,7 @@ namespace LuckyTowerCoop.Net
 
         private static readonly Dictionary<LocaDatabase.Characters, GamePlayer> s_formPrefabs = new Dictionary<LocaDatabase.Characters, GamePlayer>();
 
-        /// <summary>Префаб игрока для формы тела (монстр после зелья, Эвелиус…); null — обычный Ванст.</summary>
+        /// <summary>Player prefab for a body form (monster after a potion, Evelius...); null - regular Wanst.</summary>
         private static GamePlayer PrefabForForm(LocaDatabase.Characters form)
         {
             if (form == LocaDatabase.Characters.Wanst || form == LocaDatabase.Characters.None)
@@ -1706,7 +1706,7 @@ namespace LuckyTowerCoop.Net
             }
             else
             {
-                Plugin.Log.LogWarning($"[NetClient] no player prefab for form {form} — using Wanst");
+                Plugin.Log.LogWarning($"[NetClient] no player prefab for form {form} - using Wanst");
             }
             return found;
         }
@@ -1762,7 +1762,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= кадр =================
+        // ================= frame =================
 
         internal void Tick(bool connected)
         {
@@ -1800,7 +1800,7 @@ namespace LuckyTowerCoop.Net
             Interpolate();
         }
 
-        // ---------- обзор: свой персонаж погиб — камера, туман и свет игры идут за напарником ----------
+        // ---------- spectating: own character died - the game's camera, fog and light follow the partner ----------
 
         private void UpdateViewTarget(GameManager gm)
         {
@@ -1818,7 +1818,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ---------- зоны камеры: у марионеток нет физики, триггеры проверяем сами по своему персонажу ----------
+        // ---------- camera zones: puppets have no physics, so we check triggers ourselves against our own character ----------
 
         private static readonly System.Reflection.MethodInfo s_zoneEnter = AccessTools.Method(typeof(SnapCameraToCollider), "OnTriggerEnter2D");
         private static readonly System.Reflection.MethodInfo s_zoneExit = AccessTools.Method(typeof(SnapCameraToCollider), "OnTriggerExit2D");
@@ -1886,8 +1886,8 @@ namespace LuckyTowerCoop.Net
             float rtSeat = 0f, rtWorld = 0f;
             if (buffered)
             {
-                // показываем мир в прошлом на «интервал снапшотов + джиттер»: тогда почти всегда есть два снапшота вокруг
-                // момента показа. Задержка меняется плавно, чтобы время показа не прыгало.
+                // show the world in the past by "snapshot interval + jitter": then there are almost always two snapshots around
+                // the display moment. The delay changes smoothly so the display time doesn't jump.
                 float jit = Mathf.Min(m_clock.Jitter, 0.25f);
                 m_delaySeat = NetConst.SeatSnapshotInterval + jit + 0.008f;
                 m_delayWorld = NetConst.SnapshotInterval + jit + 0.012f;
@@ -1902,7 +1902,7 @@ namespace LuckyTowerCoop.Net
                     Apply(e, k);
                 }
             }
-            // персонажи игроков: снапшоты 60 Гц
+            // player characters: 60 Hz snapshots
             float kSeat = 1f - Mathf.Exp(-30f * dt);
             for (int i = 0; i < 2; i++)
             {
@@ -1913,14 +1913,14 @@ namespace LuckyTowerCoop.Net
                 }
                 if (i == (int)Seat.B)
                 {
-                    // свой персонаж: минимальная задержка — предсказание или последний снапшот (буфер тут только мешал бы)
+                    // own character: minimal delay - prediction or the latest snapshot (the buffer would only get in the way here)
                     if (!(CoopConfig.NetPredict.Value && PredictOwn(e, kSeat)))
                     {
                         Apply(e, kSeat);
                     }
                     continue;
                 }
-                // напарник
+                // partner
                 if (buffered && e.Interp != null && ApplyBuffered(e, rtSeat, 0.1f, out bool extrapolated, out var shownVel))
                 {
                     NetQuality.OnPartnerFrame(e.T.position, shownVel, dt, extrapolated);
@@ -1933,14 +1933,14 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Поза из буфера интерполяции в момент времени хоста rt. false — буфер пуст.</summary>
+        /// <summary>Pose from the interpolation buffer at host time rt. false - buffer is empty.</summary>
         private static bool ApplyBuffered(NetEntity e, float rt, float maxExtrapolate, out bool extrapolated, out Vector2 velocity)
         {
             extrapolated = false;
             velocity = Vector2.zero;
             if (!e.HasTarget || !e.Alive || e.Attached)
             {
-                return true; // нечего двигать — и старому пути тоже
+                return true; // nothing to move - for the old path too
             }
             FreezeCorpse(e);
             if (!e.Interp.Sample(rt, maxExtrapolate, out var pos, out var rot, out var flip, out extrapolated, out velocity))
@@ -1965,12 +1965,12 @@ namespace LuckyTowerCoop.Net
             return true;
         }
 
-        // ---------- предсказание: свой персонаж идёт по нажатию сразу, хост догоняет ----------
+        // ---------- prediction: own character moves on key press immediately, the host catches up ----------
 
         private static readonly int[] s_predMask = new int[1];
 
-        // сверка предсказания: где мы показывали своего персонажа, когда отправили нажатие №N, и где он у хоста,
-        // когда хост это нажатие применил. Разница — настоящая ошибка предсказания (без отставания на пинг).
+        // prediction reconcile: where we showed our character when we sent press #N, and where it is on the host
+        // when the host applied that press. The difference is the real prediction error (without ping lag).
         private readonly ushort[] m_predSeq = new ushort[64];
         private readonly float[] m_predX = new float[64];
         private readonly bool[] m_predValid = new bool[64];
@@ -1989,10 +1989,10 @@ namespace LuckyTowerCoop.Net
             {
                 return;
             }
-            m_predValid[i] = false; // одно нажатие сверяем один раз
+            m_predValid[i] = false; // one press is reconciled once
             float err = hostX - m_predX[i];
             NetQuality.OnReconcile(err);
-            float shift = Mathf.Abs(err) > 1.5f ? err : err * 0.2f; // мелкое — плавно, большое (толчок, телепорт) — сразу
+            float shift = Mathf.Abs(err) > 1.5f ? err : err * 0.2f; // small - smoothly, large (knockback, teleport) - immediately
             if (Mathf.Abs(err) > 1.5f)
             {
                 NetQuality.OnCorrectionSnap();
@@ -2006,12 +2006,12 @@ namespace LuckyTowerCoop.Net
             {
                 if (m_predValid[k] && (short)(m_predSeq[k] - ack) > 0)
                 {
-                    m_predX[k] += shift; // более поздние предсказания уже учли бы эту поправку
+                    m_predX[k] += shift; // later predictions would already have included this correction
                 }
             }
         }
 
-        /// <summary>Горизонтальное движение своего персонажа — от локального ввода; вертикаль и всё остальное — от хоста.</summary>
+        /// <summary>Horizontal movement of own character comes from local input; vertical and everything else from the host.</summary>
         private bool PredictOwn(NetEntity e, float k)
         {
             var own = e.Character as GamePlayer;
@@ -2035,7 +2035,7 @@ namespace LuckyTowerCoop.Net
             var pos = t.position;
             if (Time.unscaledTime - m_predActiveAt > 0.2f)
             {
-                // предсказание только что включилось (после двери, смерти, окна) — старая история не годится
+                // prediction just switched on (after a door, death, window) - old history is invalid
                 System.Array.Clear(m_predValid, 0, m_predValid.Length);
                 m_predShift = 0f;
             }
@@ -2045,12 +2045,12 @@ namespace LuckyTowerCoop.Net
             var host = e.TargetPos + (Vector3)(e.Vel * Mathf.Min(Time.unscaledTime - e.SnapTime, 0.1f));
             float speed = Mathf.Abs(e.Vel.x) > 0.5f ? Mathf.Abs(e.Vel.x) : own.Stats.MovementSpeed * 2f * own.Stats.MovementSpeedMultiplier;
             float rtt = Mathf.Clamp(m_sender.AppliedLagMs / 1000f, 0.03f, 1f);
-            // хост показывает нас с отставанием на пинг: допустимое расхождение растёт с пингом
+            // the host shows us lagging by ping: allowed divergence grows with ping
             float allowed = speed * (rtt + 0.2f) + 1.5f;
             if ((host - pos).sqrMagnitude > allowed * allowed)
             {
                 NetQuality.OnCorrectionSnap();
-                t.position = host; // разошлись сильнее, чем объясняет пинг (телепорт, дверь) — верим хосту
+                t.position = host; // diverged more than ping explains (teleport, door) - trust the host
                 System.Array.Clear(m_predValid, 0, m_predValid.Length);
                 return true;
             }
@@ -2080,8 +2080,8 @@ namespace LuckyTowerCoop.Net
             }
             else
             {
-                // отпустили: хост ещё идёт пинг-времени и остановится там, где мы уже стоим. Сверка подправит;
-                // к хосту тянемся, только когда он точно остановился
+                // released: the host keeps walking for a ping-time and will stop where we already stand. Reconcile will correct it;
+                // we only pull toward the host once it has definitely stopped
                 if (Time.unscaledTime - m_lastMoveInputAt > rtt + 0.3f)
                 {
                     pos.x = Mathf.Lerp(pos.x, host.x, k);
@@ -2108,7 +2108,7 @@ namespace LuckyTowerCoop.Net
             return true;
         }
 
-        /// <summary>Стена/край впереди (по слоям столкновений персонажа) — не предсказываем шаг в неё.</summary>
+        /// <summary>Wall/ledge ahead (by the character's collision layers) - don't predict a step into it.</summary>
         private static bool Blocked(GamePlayer own, float dir, float distance)
         {
             var col = own.Components != null ? own.Components.Collider as BoxCollider2D : null;
@@ -2123,14 +2123,14 @@ namespace LuckyTowerCoop.Net
             return hit.collider != null && !hit.collider.isTrigger && hit.collider.GetComponentInParent<Character>() == null;
         }
 
-        /// <summary>Задержка «мой ввод → применён хостом → снапшот у меня», мс (0 — ещё не измерено).</summary>
+        /// <summary>Latency "my input -> applied by host -> snapshot back to me", ms (0 - not measured yet).</summary>
         public float InputLagMs => m_sender.AppliedLagMs;
 
         private static void FreezeCorpse(NetEntity e)
         {
             if (!e.CorpseFrozen && e.Kind == EntityKind.Character && e.Character != null && e.Character.Stats.Dead)
             {
-                // тело врага повторяет хоста: своя физика трупа у клиента уводила его в сторону
+                // the enemy body follows the host: the client's own corpse physics pushed it sideways
                 e.CorpseFrozen = true;
                 foreach (var rb in e.Go.GetComponentsInChildren<Rigidbody2D>(true))
                 {
@@ -2151,7 +2151,7 @@ namespace LuckyTowerCoop.Net
             var target = e.TargetPos;
             if (e.Kind == EntityKind.Seat && e.Vel.sqrMagnitude > 0.01f)
             {
-                float age = Mathf.Min(Time.unscaledTime - e.SnapTime, 0.1f); // не дальше 100 мс: иначе уедем в стену
+                float age = Mathf.Min(Time.unscaledTime - e.SnapTime, 0.1f); // no more than 100 ms: otherwise we'd drift into a wall
                 target += (Vector3)(e.Vel * age);
             }
             t.position = (target - pos).sqrMagnitude > 9f ? target : Vector3.Lerp(pos, target, k);
@@ -2168,7 +2168,7 @@ namespace LuckyTowerCoop.Net
                 t.localScale = scale;
             }
         }
-        /// <summary>Отладка: «забыть» N сущностей (как будто регистрация потерялась) — проверка автоматической ресинхронизации.</summary>
+        /// <summary>Debug: "forget" N entities (as if registration was lost) - tests automatic resync.</summary>
         internal string DebugDesync(int n)
         {
             var ids = new List<int>(m_byId.Keys);

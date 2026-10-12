@@ -7,8 +7,8 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Coop
 {
     /// <summary>
-    /// Монеты персонажей: выдать, забрать, передать напарнику. Монеты живут в кошеле на поясе (GoldSack, до 20),
-    /// в кошеле/монете в руках. Всё выполняется на стороне, где персонаж симулируется (хост или локальная игра).
+    /// Character coins: give, take, hand over to the partner. Coins live in a belt pouch (GoldSack, up to 20),
+    /// in a pouch/coin held in hand. All of it runs on the side that simulates the character (host or local play).
     /// </summary>
     internal static class CoopGold
     {
@@ -16,7 +16,7 @@ namespace LuckyTowerCoop.Coop
 
         public static int Count(GamePlayer p) => p != null && p.Stats != null ? p.Stats.CurrentGoldCount() : 0;
 
-        /// <summary>Сколько монет ещё поместится на пояс (нет кошеля — создадим пустой на 20).</summary>
+        /// <summary>How many more coins fit on the belt (no pouch - an empty one for 20 will be created).</summary>
         public static int FreeSpace(GamePlayer p)
         {
             if (p == null || p.Stats == null)
@@ -27,7 +27,7 @@ namespace LuckyTowerCoop.Coop
             return sack == null ? SackMax : System.Math.Max(0, sack.MaxGold - sack.CurrentGold);
         }
 
-        /// <summary>Положить монеты на пояс (кошель создаётся при необходимости, как при подборе). Возвращает, сколько положено.</summary>
+        /// <summary>Put coins on the belt (a pouch is created if needed, as when picking up). Returns how many were put.</summary>
         public static int Add(GamePlayer p, int amount)
         {
             if (p == null || p.Stats == null || amount <= 0)
@@ -67,7 +67,7 @@ namespace LuckyTowerCoop.Coop
             }
         }
 
-        /// <summary>Списать монеты (кошель в руках, монета в руках, пояс — в порядке игры). Возвращает, сколько списано.</summary>
+        /// <summary>Deduct coins (pouch in hand, coin in hand, belt - in the game's order). Returns how many were deducted.</summary>
         public static int Remove(GamePlayer p, int amount)
         {
             if (p == null || p.Stats == null || amount <= 0)
@@ -91,7 +91,7 @@ namespace LuckyTowerCoop.Coop
             return amount;
         }
 
-        /// <summary>Установить ровно столько монет (отладка): остальные списываются / докладываются на пояс.</summary>
+        /// <summary>Set exactly this many coins (debug): the rest is deducted / added to the belt.</summary>
         public static int Set(GamePlayer p, int total)
         {
             int cur = Count(p);
@@ -106,7 +106,7 @@ namespace LuckyTowerCoop.Coop
             return Count(p);
         }
 
-        /// <summary>Передать напарнику не больше amount монет (сколько есть и сколько у него влезет). Возвращает переданное.</summary>
+        /// <summary>Give the partner up to amount coins (as many as available and as many as fit). Returns the amount given.</summary>
         public static int Transfer(GamePlayer from, GamePlayer to, int amount)
         {
             if (from == null || to == null || from == to || from.Stats == null || to.Stats == null || from.Stats.Dead || to.Stats.Dead)
@@ -122,24 +122,24 @@ namespace LuckyTowerCoop.Coop
             int added = Add(to, removed);
             if (added < removed)
             {
-                Add(from, removed - added); // не влезло — вернуть
+                Add(from, removed - added); // did not fit - give back
             }
             return added;
         }
 
 
-        /// <summary>Место первого/второго персонажа в меню: у клиента его собственный (P1) — место B.</summary>
+        /// <summary>Seat of the first/second character in the menu: for the client their own character (P1) is seat B.</summary>
         public static Seat SeatOf(bool first) => NetSession.IsClient ? (first ? Seat.B : Seat.A) : (first ? CoopPlayers.MainSeat : CoopPlayers.SecondSeat);
 
-        /// <summary>Сколько монет у места по последнему слову хоста (на клиенте персонажи — марионетки без кошелей).</summary>
+        /// <summary>Coins of a seat according to the host's latest word (on the client the characters are puppets without pouches).</summary>
         public static readonly int[] SeatTotals = new int[2];
 
-        /// <summary>Монеты персонажа места: на клиенте — присланные хостом, иначе считаются по кошелям.</summary>
+        /// <summary>Coins of the seat's character: on the client - as sent by the host, otherwise counted from pouches.</summary>
         public static int TotalOf(GamePlayer p, Seat seat) => NetSession.IsClient ? SeatTotals[(int)seat] : Count(p);
 
         /// <summary>
-        /// Передать напарнику монеты «моего» персонажа. Хост / локальная игра — сразу; клиент — просьба хосту (меняет только хост).
-        /// Возвращает переданное (для клиента всегда 0: ответ — в числах монет в следующем PlayerState).
+        /// Give the partner coins from "my" character. Host / local play - immediately; client - a request to the host (only the host changes anything).
+        /// Returns the amount given (always 0 for the client: the answer arrives as coin counts in the next PlayerState).
         /// </summary>
         public static int GiveToPartner(GamePlayer mine, int amount)
         {

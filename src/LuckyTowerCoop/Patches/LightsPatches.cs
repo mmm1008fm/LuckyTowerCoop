@@ -3,7 +3,7 @@ using LuckyTowerCoop.Net;
 
 namespace LuckyTowerCoop.Patches
 {
-    /// <summary>Ловушка «свет погас»: хост сообщает клиенту включение/выключение темноты; на клиенте локальные вызовы заглушены.</summary>
+    /// <summary>"Lights out" trap: the host tells the client when darkness turns on/off; local calls are suppressed on the client.</summary>
     [HarmonyPatch(typeof(LuckyTower.Traps.TrapLightsOut))]
     internal static class LightsPatches
     {

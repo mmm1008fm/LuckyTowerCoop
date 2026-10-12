@@ -11,9 +11,9 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// CharacterUtilities.HandleInput (ходьба и все команды персонажа) работает, только пока окно игры в фокусе.
-    /// Персонаж напарника у хоста управляется по сети — он должен двигаться, даже если хост свернул игру
-    /// или играет во втором окне на этом же ПК. Остальным персонажам проверка фокуса остаётся.
+    /// CharacterUtilities.HandleInput (walking and all character commands) works only while the game window is focused.
+    /// The partner character on the host is driven over the network - it must move even if the host minimized the game
+    /// or plays in a second window on the same PC. The focus check remains for other characters.
     /// </summary>
     [HarmonyPatch(typeof(CharacterUtilities), nameof(CharacterUtilities.HandleInput))]
     internal static class HandleInputFocusPatch
@@ -42,7 +42,7 @@ namespace LuckyTowerCoop.Patches
             }
             if (replaced == 0)
             {
-                Plugin.Log.LogWarning("[Focus] Application.isFocused not found in HandleInput — partner may freeze when host window is unfocused");
+                Plugin.Log.LogWarning("[Focus] Application.isFocused not found in HandleInput - partner may freeze when host window is unfocused");
             }
         }
 
@@ -50,9 +50,9 @@ namespace LuckyTowerCoop.Patches
         {
             if (Application.isFocused || NetLaunch.DevServer)
             {
-                return true; // автотесты двух копий: обе без фокуса
+                return true; // two-copy autotests: both without focus
             }
-            // персонаж напарника — тот, кем управляет его ввод (системный игрок Rewired); после смерти хоста он становится главным
+            // the partner character is the one driven by its input (the system Rewired player); after the host dies it becomes the main one
             return NetSession.IsHost && s_character(utilities) is GamePlayer p && p.PlayerInput != null && p.PlayerInput == CoopInput.P2Input;
         }
     }

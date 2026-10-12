@@ -15,8 +15,8 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Net
 {
     /// <summary>
-    /// Хост: игра идёт как в локальном коопе (персонаж клиента — второй игрок, его ввод приходит по сети),
-    /// а состояние мира транслируется клиенту.
+    /// Host: the game runs as in local co-op (the client's character is the second player, its input arrives over the network),
+    /// and the world state is broadcast to the client.
     /// </summary>
     public sealed class NetHost
     {
@@ -49,10 +49,10 @@ namespace LuckyTowerCoop.Net
             m_s = s;
         }
 
-        /// <summary>Персонаж места: A — человек на хосте, B — человек-клиент.</summary>
+        /// <summary>Seat character: A - the human on the host, B - the human client.</summary>
         internal static GamePlayer SeatChar(Seat seat) => seat == CoopPlayers.MainSeat ? CoopPlayers.P1 : CoopPlayers.P2;
 
-        // ================= жизненный цикл сессии =================
+        // ================= session lifecycle =================
 
         internal void OnClientReady(NetDataReader hello, bool rejoin)
         {
@@ -71,14 +71,14 @@ namespace LuckyTowerCoop.Net
             UnfreezeRemote();
             if (m_remoteKilledByDisconnect)
             {
-                // при обрыве персонаж напарника умер (лежит трупом с вещами) — вернётся свежим, без вещей
+                // on a drop the partner character died (lies as a corpse with items) - comes back fresh, without items
                 m_remoteKilledByDisconnect = false;
                 CoopLife.ClearDeath();
-                Plugin.Log.LogInfo("[NetHost] partner is back — a fresh character will spawn");
+                Plugin.Log.LogInfo("[NetHost] partner is back - a fresh character will spawn");
             }
 
             m_clientSceneReady = false;
-            m_sceneSent = false; // Tick отправит SceneLoad
+            m_sceneSent = false; // Tick will send SceneLoad
             m_seatState[0] = m_seatState[1] = null;
             m_uiState = "";
         }
@@ -90,27 +90,27 @@ namespace LuckyTowerCoop.Net
             var remote = SeatChar(Seat.B);
             if (remote == null || remote.Stats.Dead)
             {
-                return; // был мёртв — остаётся мёртвым, воскрешение продолжится после возвращения
+                return; // was dead - stays dead, resurrection continues after the return
             }
             var hostChar = SeatChar(Seat.A);
             if (hostChar != null && !hostChar.Stats.Dead)
             {
-                // напарник «умирает»: труп с вещами можно облутать; при возвращении появится заново голым
+                // the partner "dies": the corpse with items can be looted; on return appears again naked
                 CoopTransitions.ForceUnhide(remote);
                 remote.Actions.Die();
                 m_remoteKilledByDisconnect = true;
-                Plugin.Log.LogInfo("[NetHost] partner disconnected — their character dropped dead (lootable)");
+                Plugin.Log.LogInfo("[NetHost] partner disconnected - their character dropped dead (lootable)");
             }
             else
             {
-                // хост сам мёртв: смерть напарника закончила бы забег — держим его замороженным
+                // the host itself is dead: the partner's death would end the run - keep it frozen
                 FreezeRemote();
             }
         }
 
         internal void OnPeerGone()
         {
-            // окно переподключения истекло: персонаж клиента остаётся замороженным, место свободно для нового входа
+            // reconnect window expired: the client's character stays frozen, the seat is free for a new join
         }
 
         internal void OnSessionEnded()
@@ -146,7 +146,7 @@ namespace LuckyTowerCoop.Net
             m_frozenRemote = null;
         }
 
-        // ================= сообщения =================
+        // ================= messages =================
 
         internal void OnMessage(Msg type, NetDataReader r)
         {
@@ -186,7 +186,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= кадр =================
+        // ================= frame =================
 
         internal void Tick()
         {
@@ -207,7 +207,7 @@ namespace LuckyTowerCoop.Net
             {
                 m_sceneCounted = true;
                 m_runId++;
-                s_origin.Clear(); // новая сцена — старые объекты уничтожены
+                s_origin.Clear(); // new scene - old objects were destroyed
             }
             if (!m_sceneSent)
             {
@@ -228,8 +228,8 @@ namespace LuckyTowerCoop.Net
                 m_nextScan = now + 0.5f;
                 Scan();
             }
-            // расписание копится от прошлого срока, а не от «сейчас»: иначе при 60 кадрах/с половина кадров
-            // пропускалась и снапшоты шли неровно, 30–45 раз в секунду
+            // the schedule accumulates from the previous deadline, not from "now": otherwise at 60 frames/s half the frames
+            // were skipped and snapshots came unevenly, 30-45 times per second
             if (now >= m_nextSeatSnap - 0.002f)
             {
                 m_nextSeatSnap = NetConst.NextTick(m_nextSeatSnap, now, NetConst.SeatSnapshotInterval);
@@ -260,7 +260,7 @@ namespace LuckyTowerCoop.Net
         internal int m_registerBatches;
         private float m_lastResync = -10f;
 
-        /// <summary>Полная пересинхронизация: сцена (если клиент не готов) или комната целиком (места → комната → сущности).</summary>
+        /// <summary>Full resync: the scene (if the client isn't ready) or the whole room (seats -> room -> entities).</summary>
         public void ForceResync()
         {
             if (Time.unscaledTime - m_lastResync < 2f)
@@ -270,7 +270,7 @@ namespace LuckyTowerCoop.Net
             m_lastResync = Time.unscaledTime;
             if (!m_clientSceneReady)
             {
-                m_sceneSent = false; // Tick заново отправит SceneLoad
+                m_sceneSent = false; // Tick will send SceneLoad again
                 return;
             }
             m_seatState[0] = m_seatState[1] = null;
@@ -279,14 +279,14 @@ namespace LuckyTowerCoop.Net
             Plugin.Log.LogInfo("[NetHost] full resync sent");
         }
 
-        /// <summary>Контрольная сумма комнаты: клиент сверяет и при расхождении просит пересинхронизацию.</summary>
+        /// <summary>Room checksum: the client compares it and, on mismatch, requests a full sync.</summary>
         private void SendRoomCheck()
         {
             if (m_room == null)
             {
                 return;
             }
-            Scan(); // сначала отправить свежие регистрации/удаления, иначе сумма разойдётся на ровном месте
+            Scan(); // first send fresh registrations/removals, otherwise the sum would diverge for no reason
             uint hash = 0;
             int count = 0;
             foreach (var e in m_byId.Values)
@@ -304,7 +304,7 @@ namespace LuckyTowerCoop.Net
             m_s.Send(w, Delivery.Reliable);
         }
 
-        // ================= сцена и комната =================
+        // ================= scene and room =================
 
         private static VillageManager.LoadScene LoadSceneOf(GameData.SceneName s)
         {
@@ -332,7 +332,7 @@ namespace LuckyTowerCoop.Net
             w.Put((int)LoadSceneOf(gm.SceneName));
             w.Put(SegmentManager.Instance != null ? SegmentManager.Instance.UsedSeed : 0);
             w.Put(DataManager.Instance.GameData != null ? (int)DataManager.Instance.GameData.Difficulty : 0);
-            // деревня хоста: клиент видит её состояние (дома, жителей), а генерация башни не расходится из-за прогресса
+            // host village: the client sees its state (houses, residents), and tower generation doesn't diverge because of progress
             byte[] village = new byte[0];
             try
             {
@@ -394,12 +394,12 @@ namespace LuckyTowerCoop.Net
             m_s.Send(w, Delivery.Reliable);
             Plugin.Log.LogInfo($"[NetHost] room -> {room.name} (seg {room.SegmentID} floor {room.FloorID}, {inactive.Count} inactive objects)");
 
-            // сначала состояния мест (клиент узнаёт о сменившихся персонажах и помечает свои трупы), потом сущности
+            // seat states first (the client learns about changed characters and marks its corpses), then entities
             SendSeatStates(force: true);
             Scan();
         }
 
-        // ================= сущности =================
+        // ================= entities =================
 
         private void ClearEntities()
         {
@@ -424,17 +424,17 @@ namespace LuckyTowerCoop.Net
                 }
                 Register(ch.gameObject, EntityKind.Character, roomT, added);
             }
-            // мир: ловушки, рычаги, сундуки, двери-ловушки, полы, движущиеся части — всё с аниматором/физикой/логикой ловушки
+            // world: traps, levers, chests, trap doors, floors, moving parts - everything with an animator/physics/trap logic
             foreach (var go in WorldObjects(m_room))
             {
                 Register(go, EntityKind.Other, roomT, added);
             }
-            // летучие мыши, пчёлы: не персонажи (ловушки), но летают и анимируются
+            // bats, bees: not characters (traps), but they fly and animate
             foreach (var fb in m_room.GetComponentsInChildren<FlyingBehaviour>(true))
             {
                 Register(fb.gameObject, EntityKind.Other, roomT, added);
             }
-            // спутники, пришедшие из других комнат (идут за игроком), но лежащие вне иерархии этой комнаты
+            // companions that came from other rooms (following the player) but lie outside this room's hierarchy
             var nearBounds = m_room.CompositeCollider != null ? m_room.CompositeCollider.bounds : new Bounds(roomT.position, Vector3.one * 30f);
             nearBounds.Expand(new Vector3(2f, 4f, 1000f));
             foreach (var kv in s_origin)
@@ -453,7 +453,7 @@ namespace LuckyTowerCoop.Net
                 }
                 Register(it.gameObject, EntityKind.Item, roomT, added);
             }
-            // предметы в руках игроков (могли попасть в руки до входа в комнату)
+            // items in players' hands (could have been picked up before entering the room)
             foreach (var seat in new[] { Seat.A, Seat.B })
             {
                 var c = SeatChar(seat);
@@ -469,7 +469,7 @@ namespace LuckyTowerCoop.Net
                     }
                 }
             }
-            // трупы игроков в комнате: клиент сопоставит их со своими трупами марионеток по метке экземпляра
+            // player corpses in the room: the client matches them with its puppet corpses by instance tag
             var roomBounds = m_room.CompositeCollider != null ? m_room.CompositeCollider.bounds : new Bounds(m_room.transform.position, Vector3.one * 30f);
             roomBounds.Expand(new Vector3(2f, 20f, 1000f));
             foreach (var pl in Object.FindObjectsByType<GamePlayer>(FindObjectsSortMode.None))
@@ -481,7 +481,7 @@ namespace LuckyTowerCoop.Net
                 }
             }
 
-            // предметы, лежащие в комнате вне её иерархии (выпавшие из трупа, брошенные)
+            // items lying in the room outside its hierarchy (dropped from a corpse, thrown)
             var bounds = m_room.CompositeCollider != null ? m_room.CompositeCollider.bounds : new Bounds(m_room.transform.position, Vector3.one * 30f);
             bounds.Expand(new Vector3(2f, 2f, 1000f));
             foreach (var it in Object.FindObjectsByType<PickupItem>(FindObjectsSortMode.None))
@@ -490,7 +490,7 @@ namespace LuckyTowerCoop.Net
                     || it.GetComponentInParent<Character>() != null || !bounds.Contains(it.transform.position)
                     || !ItemCatalog.Has(GameManager.Instance.ItemLibrary, it.ItemName))
                 {
-                    continue; // заклинания и снаряды клиенту не создать — их нет в библиотеке предметов
+                    continue; // spells and projectiles can't be created on the client - they aren't in the item library
                 }
                 Register(it.gameObject, EntityKind.Item, null, added);
             }
@@ -543,7 +543,7 @@ namespace LuckyTowerCoop.Net
             return false;
         }
 
-        /// <summary>Объекты комнаты, у которых есть своя жизнь (аниматор, физика, ловушка, рычаг, сундук, повреждаемое) — кроме персонажей и предметов.</summary>
+        /// <summary>Room objects with a life of their own (animator, physics, trap, lever, chest, damageable) - except characters and items.</summary>
         private static List<GameObject> WorldObjects(Room room)
         {
             s_world.Clear();
@@ -563,13 +563,13 @@ namespace LuckyTowerCoop.Net
                 {
                     return;
                 }
-                // тени персонажей («2dShadow») вынесены в корень комнаты, но ведутся за своим персонажем сами
+                // character shadows ("2dShadow") are moved to the room root but follow their own character themselves
                 if (go.GetComponentInParent<TwoDShadow>(true) != null || go.GetComponent<DestoryDust>() != null
                     || go.name.StartsWith("fx_", System.StringComparison.OrdinalIgnoreCase))
                 {
                     return;
                 }
-                // обломки брони / остатки растений (косметика, падают за карту и не находятся у клиента)
+                // armor debris / plant remains (cosmetic, fall off the map and aren't found on the client)
                 if (IsLeftover(go))
                 {
                     return;
@@ -589,9 +589,9 @@ namespace LuckyTowerCoop.Net
         {
             if (m_byGo.ContainsKey(go) || (kind != EntityKind.Character && IsLeftover(go)))
             {
-                return; // обломки брони/сундука/бочки — косметика: падают за карту и не находятся у клиента
+                return; // armor/chest/barrel debris - cosmetic: falls off the map and isn't found on the client
             }
-            // лишний монстр (сложность): у клиента его нет — клиент копирует свою марионетку-источник
+            // extra monster (difficulty): the client doesn't have it - the client copies its own source puppet
             if (CoopDifficulty.TryGetCloneSource(go, out var source))
             {
                 if (!m_byGo.ContainsKey(source))
@@ -609,8 +609,8 @@ namespace LuckyTowerCoop.Net
                 }
             }
             string path = roomT != null ? NetPaths.PathOf(go.transform, roomT) : null;
-            // персонаж запоминается по комнате, где его увидели впервые: спутник, перешедший за игроком в другую комнату,
-            // у клиента остался на старом месте — клиент найдёт его там и перенесёт
+            // the character is remembered by the room where it was first seen: a companion that followed the player into another room
+            // stayed at its old place on the client - the client will find it there and move it
             string origin = null;
             if (kind == EntityKind.Character)
             {
@@ -642,7 +642,7 @@ namespace LuckyTowerCoop.Net
                 id = m_nextRuntimeId++;
             }
             var e = NetEntity.For(id, go, kind);
-            e.SpawnedByNet = path == null && origin == null; // путь пустой — клиент создаёт по имени предмета
+            e.SpawnedByNet = path == null && origin == null; // empty path - the client creates it by item name
             if (origin != null)
             {
                 s_originOf[e] = origin;
@@ -700,19 +700,19 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= снапшоты =================
+        // ================= snapshots =================
 
         private bool m_stampLogged;
 
         private NetDataWriter BeginSnapshot(out int countPos, bool physicsStamp = false)
         {
             var w = m_s.Begin(Msg.Snapshot);
-            // время хоста для буфера интерполяции у клиента (реальное, не игровое). Персонажи двигаются шагами физики
-            // (50 в секунду), а кадров 60: метка кадра давала пары снапшотов с одной позицией и «замирания» у клиента.
-            // Поэтому снапшот игроков метим временем последнего шага физики.
+            // host time for the client's interpolation buffer (real, not game time). Characters move in physics steps
+            // (50 per second) but there are 60 frames: a frame timestamp gave snapshot pairs with the same position and "freezes" on the client.
+            // So the player snapshot is stamped with the time of the last physics step.
             w.Put(physicsStamp ? Time.fixedUnscaledTime : Time.unscaledTime);
             w.Put(LayerManager.CurrentPlayerLayer);
-            w.Put(m_input.LastSeq); // замер задержки у клиента: последний применённый пакет ввода
+            w.Put(m_input.LastSeq); // latency measurement on the client: the last applied input packet
             countPos = w.Length;
             w.Put((ushort)0);
             return w;
@@ -747,7 +747,7 @@ namespace LuckyTowerCoop.Net
                 bool active = e.Go.activeInHierarchy;
                 if (!string.IsNullOrEmpty(e.AttachKey) && active == e.SentActive)
                 {
-                    continue; // в руке: у клиента висит на той же кости
+                    continue; // in hand: on the client it hangs on the same bone
                 }
                 var pos = e.T.position;
                 float rot = e.T.eulerAngles.z;
@@ -768,7 +768,7 @@ namespace LuckyTowerCoop.Net
                 WriteEntry(m_entryScratch, e.Id, e.T, active, animated && active ? e.Anim : null, e, null, e.Character);
                 if (count > 0 && w.Length + m_entryScratch.Length > NetConst.MaxPacket)
                 {
-                    Flush(); // LiteNetLib: ненадёжный пакет не больше 1023 байт
+                    Flush(); // LiteNetLib: an unreliable packet is at most 1023 bytes
                 }
                 w.Put(m_entryScratch.Data, 0, m_entryScratch.Length);
                 count++;
@@ -780,7 +780,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Персонажи игроков: 60 Гц, со скоростью (клиент экстраполирует между снапшотами).</summary>
+        /// <summary>Player characters: 60 Hz, with velocity (the client extrapolates between snapshots).</summary>
         private void SendSeatSnapshot()
         {
             var rbA = SeatChar(Seat.A)?.Components.Rigidbody;
@@ -800,7 +800,7 @@ namespace LuckyTowerCoop.Net
                     continue;
                 }
                 var anim = c.Components.Animator != null ? c.Components.Animator.AnimatorComponent : null;
-                // «активен» для места = графика видна (ожидание у двери прячет персонажа)
+                // "active" for a seat = graphics visible (waiting at a door hides the character)
                 bool visible = !CoopVisibility.IsHidden(c);
                 WriteEntry(w, seat == Seat.A ? NetPaths.SeatA : NetPaths.SeatB, c.transform, visible, anim, m_seatCache[(int)seat], c.Components.Rigidbody);
                 count++;
@@ -816,7 +816,7 @@ namespace LuckyTowerCoop.Net
         private readonly NetDataWriter m_entryScratch = new NetDataWriter(true, 768);
         private readonly NetEntity[] m_seatCache = { new NetEntity(), new NetEntity() };
 
-        /// <summary>Аниматор уходит, только если его состояние поменялось (или раз в 0.5 с для подстраховки).</summary>
+        /// <summary>The animator is sent only if its state changed (or every 0.5 s as a safeguard).</summary>
         private void WriteEntry(NetDataWriter w, int id, Transform t, bool active, Animator anim, NetEntity cache, Rigidbody2D rb = null, Character ch = null)
         {
             bool sendAnim = false;
@@ -864,7 +864,7 @@ namespace LuckyTowerCoop.Net
             if (cache.Audio != null)
             {
                 cache.SentAudio = cache.Audio.isPlaying;
-                flags |= 64; // есть бит звука
+                flags |= 64; // sound bit present
                 if (cache.SentAudio)
                 {
                     flags |= 32;
@@ -887,7 +887,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // ================= игроки, интерфейс, события =================
+        // ================= players, interface, events =================
 
         private void SendSeatStates(bool force = false)
         {
@@ -930,7 +930,7 @@ namespace LuckyTowerCoop.Net
                     w.Put(0f);
                     w.Put(0f);
                 }
-                // зубы — это ХП Ванста (дырки в улыбке)
+                // teeth are Wanst's HP (gaps in the smile)
                 int nTeeth = teeth != null ? Mathf.Min(teeth.Count, 16) : 0;
                 w.Put((byte)nTeeth);
                 for (int t = 0; t < nTeeth; t++)
@@ -940,7 +940,7 @@ namespace LuckyTowerCoop.Net
                     w.Put((byte)Mathf.Clamp(teeth[t].MaxHits, 0, 255));
                     w.Put((byte)Mathf.Clamp(teeth[t].CurrentHits, 0, 255));
                 }
-                w.Put((byte)form); // форма тела (Wanst/Monster/Evelius…): клиент создаёт марионетку из того же префаба
+                w.Put((byte)form); // body form (Wanst/Monster/Evelius...): the client creates the puppet from the same prefab
                 w.Put(total);
                 m_s.Send(w, Delivery.Reliable);
             }
@@ -950,7 +950,7 @@ namespace LuckyTowerCoop.Net
         private readonly NetDataWriter m_lookScratch = new NetDataWriter(true, 1024);
         private readonly float[] m_lookTime = { -10f, -10f };
 
-        /// <summary>Видимость частей персонажей мест (вид со спины у двери, кошель, зубы) — при изменении и раз в 2 с.</summary>
+        /// <summary>Visibility of seat character parts (back view at a door, pouch, teeth) - on change and every 2 s.</summary>
         private void SendLooks(float now)
         {
             foreach (var seat in new[] { Seat.A, Seat.B })
@@ -976,7 +976,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Предметы в руках/на спине: к какому месту и кости прикреплены (у клиента предмет крепится к той же кости марионетки).</summary>
+        /// <summary>Items in hands/on back: which seat and bone they're attached to (on the client the item attaches to the same puppet bone).</summary>
         private void SendAttachments()
         {
             var a = SeatChar(Seat.A);
@@ -1060,7 +1060,7 @@ namespace LuckyTowerCoop.Net
             m_s.Send(w, Delivery.Reliable);
         }
 
-        /// <summary>Префикс Die: какой ID у умирающего (место или сущность).</summary>
+        /// <summary>Die prefix: the ID of the dying one (seat or entity).</summary>
         internal int IdOf(Character c)
         {
             if (c == null)
@@ -1094,7 +1094,7 @@ namespace LuckyTowerCoop.Net
             m_s.Send(m_s.Begin(Msg.GameOver), Delivery.Reliable);
         }
 
-        /// <summary>ID зарегистрированного объекта по трансформу (сам или ближайший родитель); 0 — не зарегистрирован.</summary>
+        /// <summary>ID of a registered object by transform (itself or the nearest parent); 0 - not registered.</summary>
         internal int IdOfTransform(Transform t)
         {
             for (var cur = t; cur != null; cur = cur.parent)
@@ -1116,7 +1116,7 @@ namespace LuckyTowerCoop.Net
             return 0;
         }
 
-        /// <summary>Окно выбора у персонажа клиента: открыть (state, кнопки) / закрыть — клиент показывает такое же у себя.</summary>
+        /// <summary>Selection window on the client's character: open (state, buttons) / close - the client shows the same on its side.</summary>
         internal void SendWindow(bool open, TalkState state, bool canBeClosed, bool follow, float delay, Transform target, Vector2 offset, string ov1, string ov2, string ov3)
         {
             if (!NetSession.PeerReady)
@@ -1145,7 +1145,7 @@ namespace LuckyTowerCoop.Net
             m_s.Send(w, Delivery.Reliable);
         }
 
-        /// <summary>Ловушка «свет погас»: темнота включилась/выключилась — клиент повторяет на своей копии ловушки.</summary>
+        /// <summary>"Lights out" trap: darkness turned on/off - the client repeats it on its copy of the trap.</summary>
         internal void SendLights(LuckyTower.Traps.TrapLightsOut trap, bool off, bool instant)
         {
             if (trap == null || !NetSession.PeerReady)
@@ -1168,7 +1168,7 @@ namespace LuckyTowerCoop.Net
             m_s.Send(w, Delivery.Reliable);
         }
 
-        /// <summary>Взрыв башни (бочка с порохом): клиент показывает тот же ролик, смерть придёт обычным путём.</summary>
+        /// <summary>Tower explosion (powder keg): the client plays the same cutscene, death arrives the usual way.</summary>
         internal void SendTowerExplosion()
         {
             if (!NetSession.PeerReady)
@@ -1194,14 +1194,14 @@ namespace LuckyTowerCoop.Net
             w.Put(endless);
             m_s.Send(w, Delivery.Reliable);
         }
-        /// <summary>Клиент просил начать заново (меню хоста показывает вопрос, пока не ответили).</summary>
+        /// <summary>The client asked to start over (the host menu shows a question until answered).</summary>
         public float RestartAskedAt { get; set; } = -100f;
 
-        /// <summary>Хост согласился: обычный перезапуск забега, клиент получит SceneLoad.</summary>
+        /// <summary>The host agreed: a normal run restart, the client gets SceneLoad.</summary>
         public void RestartRun()
         {
             RestartAskedAt = -100f;
-            // LoadNewGame меню паузы работает только при открытом меню; перезапуск забега — как у игровой команды restart
+            // the pause menu's LoadNewGame works only while the menu is open; the run restart is like the game's restart command
             Time.timeScale = 1f;
             SceneLoader.LoadMasterScene();
         }

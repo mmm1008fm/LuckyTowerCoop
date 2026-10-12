@@ -5,8 +5,8 @@ using UnityEngine;
 namespace LuckyTowerCoop.Coop
 {
     /// <summary>
-    /// Спрятать/показать персонажа целиком (ожидание у двери). Выключить только объект аниматора мало:
-    /// трусы, броня и эффекты рисуются отдельными объектами — гасим все включённые рендеры и потом включаем ровно их.
+    /// Hide/show a whole character (waiting at a door). Disabling just the animator object is not enough:
+    /// shorts, armor and effects are drawn by separate objects - we turn off all enabled renderers and later turn exactly those back on.
     /// </summary>
     internal static class CoopVisibility
     {
@@ -34,8 +34,8 @@ namespace LuckyTowerCoop.Coop
                 if (!s_hidden.ContainsKey(c))
                 {
                     Cleanup();
-                    // рендеры внутри графики аниматора не трогаем: их включение ведут анимации, а при повторном включении
-                    // аниматор запоминает текущее состояние как исходное — выключенные нами части остались бы выключенными навсегда
+                    // we do not touch renderers inside the animator graphics: their enabling is driven by animations, and on re-enabling
+                    // the animator remembers the current state as the initial one - parts we turned off would stay off forever
                     var list = new List<Renderer>();
                     foreach (var r in c.GetComponentsInChildren<Renderer>(false))
                     {

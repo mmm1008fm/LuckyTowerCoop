@@ -10,10 +10,10 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <GenerateDependencyFile>false</GenerateDependencyFile>
     <DebugType>embedded</DebugType>
-    <!-- Сетевые зависимости (LiteNetLib) кладём рядом с плагином -->
+    <!-- Network dependencies (LiteNetLib) are placed next to the plugin -->
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
 
-    <!-- Путь к игре можно переопределить: dotnet build -p:GameDir=... -->
+    <!-- The game path can be overridden: dotnet build -p:GameDir=... -->
     <GameDir Condition="'$(GameDir)' == ''">D:\game\Lucky.Tower.Ultimate.v1.1.4</GameDir>
     <ManagedDir>$(GameDir)\Lucky Tower Ultimate_Data\Managed</ManagedDir>
     <BepInExDir>$(GameDir)\BepInEx</BepInExDir>
@@ -44,7 +44,7 @@
     <Reference Include="UnityEngine.VideoModule" HintPath="$(ManagedDir)\UnityEngine.VideoModule.dll" Private="false" />
   </ItemGroup>
 
-  <!-- После сборки кладём плагин и LiteNetLib прямо в игру -->
+  <!-- After the build, copy the plugin and LiteNetLib straight into the game -->
   <Target Name="DeployToGame" AfterTargets="Build">
     <MakeDir Directories="$(PluginDir)" />
     <Copy SourceFiles="$(TargetPath);$(OutDir)LiteNetLib.dll" DestinationFolder="$(PluginDir)" />

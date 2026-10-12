@@ -4,7 +4,7 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 
 namespace LuckyTowerCoop.Coop
 {
-    /// <summary>Подписи над персонажами: онлайн — «Вы» и имя напарника, локально — «1» и «2» (персонажи одинаковые, их легко спутать).</summary>
+    /// <summary>Labels above the characters: online - "You" and the partner's name, local - "1" and "2" (the characters look identical, easy to mix up).</summary>
     public class CoopLabels : MonoBehaviour
     {
         private GUIStyle m_style;
@@ -23,7 +23,7 @@ namespace LuckyTowerCoop.Coop
             var p2 = CoopPlayers.P2;
             if (p1 == null || p2 == null)
             {
-                return; // один персонаж — подписывать незачем
+                return; // single character - nothing to label
             }
             var cam = CoopCamera.CameraManagerSilent;
             if (cam == null || cam.MainCamera == null)
@@ -36,8 +36,8 @@ namespace LuckyTowerCoop.Coop
                 m_style = new GUIStyle(GUI.skin.label) { fontSize = Mathf.Max(12, Mathf.RoundToInt(Screen.height / 48f)), fontStyle = FontStyle.Bold, alignment = TextAnchor.LowerCenter };
             }
             bool online = NetSession.Role != NetRole.None;
-            string partner = online && NetSession.Instance != null && !string.IsNullOrEmpty(NetSession.Instance.PeerName) ? NetSession.Instance.PeerName : "Напарник";
-            Draw(cam.MainCamera, p1, online ? "Вы" : "1", s_own);
+            string partner = online && NetSession.Instance != null && !string.IsNullOrEmpty(NetSession.Instance.PeerName) ? NetSession.Instance.PeerName : "Partner";
+            Draw(cam.MainCamera, p1, online ? "You" : "1", s_own);
             Draw(cam.MainCamera, p2, online ? partner : "2", s_partner);
         }
 

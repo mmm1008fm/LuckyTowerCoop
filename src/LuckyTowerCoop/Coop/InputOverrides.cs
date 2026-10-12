@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace LuckyTowerCoop.Coop
 {
-    /// <summary>Источник «нажатий», который подмешивается к Rewired-игроку (скрипт для тестов, сеть).</summary>
+    /// <summary>Source of "presses" mixed into a Rewired player (test script, network).</summary>
     public interface IButtonSource
     {
         bool GetButton(int actionId);
@@ -12,8 +12,8 @@ namespace LuckyTowerCoop.Coop
     }
 
     /// <summary>
-    /// Реестр подмешиваемых источников по id Rewired-игрока.
-    /// Патчи Rewired.Player.GetButton* делают OR с реальным устройством и всеми источниками.
+    /// Registry of mixed-in sources by Rewired player id.
+    /// Rewired.Player.GetButton* patches OR the real device with all sources.
     /// </summary>
     internal static class InputOverrides
     {
@@ -95,7 +95,7 @@ namespace LuckyTowerCoop.Coop
         }
     }
 
-    /// <summary>Скриптуемый ввод для отладки: удержание действий на время, края Down/Up считаются по кадрам.</summary>
+    /// <summary>Scriptable input for debugging: hold actions for a duration, Down/Up edges are counted per frame.</summary>
     public class ScriptedButtonSource : IButtonSource
     {
         private readonly Dictionary<int, float> m_holdUntil = new Dictionary<int, float>();
@@ -166,7 +166,7 @@ namespace LuckyTowerCoop.Coop
         }
     }
 
-    /// <summary>Имена действий Rewired (RewiredConsts.InputActions) для отладочных команд.</summary>
+    /// <summary>Rewired action names (RewiredConsts.InputActions) for debug commands.</summary>
     internal static class ActionNames
     {
         public static readonly Dictionary<string, int> Map = new Dictionary<string, int>

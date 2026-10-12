@@ -9,7 +9,7 @@ using InputSystemGamepad = UnityEngine.InputSystem.Gamepad;
 
 namespace LuckyTowerCoop.Coop
 {
-    /// <summary>Диагностические дампы состояния (в лог и в ответ отладочного сервера). F8 — дамп в лог.</summary>
+    /// <summary>Diagnostic state dumps (to the log and in the debug server reply). F8 - dump to the log.</summary>
     public class CoopProbe : MonoBehaviour
     {
         private void Update()

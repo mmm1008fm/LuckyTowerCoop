@@ -5,9 +5,9 @@ using UnityEngine;
 namespace LuckyTowerCoop.Net
 {
     /// <summary>
-    /// Оценка «сколько сейчас времени у хоста» по меткам времени в снапшотах.
-    /// Смещение часов берём по наименее задержанному пакету (максимум hostTime − localTime), джиттер — насколько
-    /// остальные пакеты опаздывают относительно него (верхняя оценка, быстро растёт и медленно спадает).
+    /// Estimate of "what time it is now on the host" from timestamps in snapshots.
+    /// The clock offset is taken from the least delayed packet (max of hostTime - localTime); jitter is how much
+    /// the other packets lag behind it (an upper estimate that rises quickly and decays slowly).
     /// </summary>
     internal sealed class NetClock
     {
@@ -18,15 +18,15 @@ namespace LuckyTowerCoop.Net
 
         public static double LocalNow => Stopwatch.GetTimestamp() / (double)Stopwatch.Frequency;
 
-        /// <summary>Разброс задержки пакетов, с (≈ 95-й процентиль).</summary>
+        /// <summary>Packet delay spread, s (~ 95th percentile).</summary>
         public float Jitter => m_jitter;
 
         public bool Ready => m_has;
 
         public double HostNow => UnityEngine.Time.realtimeSinceStartupAsDouble + m_offset;
 
-        // приём и показ — по часам Unity: показ привязан к началу кадра, иначе шаг движения зависел бы от того,
-        // в какой момент кадра мы рисуем (неровные кадры давали «замирания»)
+        // receive and display use the Unity clock: display is tied to the frame start, otherwise the movement step would depend on
+        // when in the frame we render (uneven frames caused "freezes")
         private static double RecvNow => UnityEngine.Time.realtimeSinceStartupAsDouble;
 
         private static double FrameNow => UnityEngine.Time.unscaledTimeAsDouble;
@@ -37,13 +37,13 @@ namespace LuckyTowerCoop.Net
             double s = hostTime - local;
             if (!m_has || s > m_offset || s < m_offset - 1.0)
             {
-                // пакет пришёл быстрее прежнего лучшего (или хост перезапустился) — новое смещение
+                // packet arrived faster than the previous best (or the host restarted) - new offset
                 m_offset = s;
                 m_has = true;
             }
             else
             {
-                // медленно опускаем оценку: часы могут уплывать, маршрут — меняться
+                // slowly lower the estimate: clocks may drift, the route may change
                 m_offset = Math.Max(s, m_offset - 0.002 * (local - m_lastLocal));
             }
             m_lastLocal = local;
@@ -58,8 +58,8 @@ namespace LuckyTowerCoop.Net
         }
 
         /// <summary>
-        /// Непрерывное время показа «время хоста − задержка»: оценка смещения часов и задержка меняются скачками,
-        /// а показ — нет: время показа идёт со скоростью 0,94…1,06 от реальной, пока не догонит цель.
+        /// Continuous display time "host time - delay": the clock offset estimate and the delay change in jumps,
+        /// but the display does not: display time runs at 0.94...1.06 of real speed until it catches up with the target.
         /// </summary>
         public sealed class RenderTrack
         {
@@ -85,8 +85,8 @@ namespace LuckyTowerCoop.Net
     }
 
     /// <summary>
-    /// Буфер снапшотов одной сущности: показываем её в моменте «время хоста − задержка показа» и ведём между
-    /// соседними снапшотами по времени. Позднее пришедший пакет не даёт рывка, потерянный — короткая экстраполяция.
+    /// Snapshot buffer for one entity: we show it at the moment "host time - display delay" and move between
+    /// neighbouring snapshots by time. A late packet causes no jerk; a lost one gets a short extrapolation.
     /// </summary>
     internal sealed class InterpBuffer
     {
@@ -109,7 +109,7 @@ namespace LuckyTowerCoop.Net
             m_head = -1;
         }
 
-        /// <param name="interval">как часто хост шлёт эту сущность, когда она движется</param>
+        /// <param name="interval">how often the host sends this entity while it moves</param>
         public void Add(float t, Vector3 p, float rot, bool flip, Vector2 vel, float interval)
         {
             if (m_count > 0)
@@ -117,12 +117,12 @@ namespace LuckyTowerCoop.Net
                 float last = m_t[m_head];
                 if (t <= last)
                 {
-                    return; // устаревший (обогнали) — уже есть новее
+                    return; // stale (overtaken) - a newer one already exists
                 }
                 if (t - last > interval * 2.5f)
                 {
-                    // хост шлёт только изменившееся: объект стоял, пока не было пакетов. Без этой точки движение
-                    // размазалось бы на всю паузу.
+                    // the host sends only what changed: the object stood still while there were no packets. Without this point the motion
+                    // would be smeared over the whole pause.
                     Push(t - interval, m_p[m_head], m_r[m_head], m_f[m_head], Vector2.zero);
                 }
             }
@@ -145,7 +145,7 @@ namespace LuckyTowerCoop.Net
 
         private int Idx(int back) => (m_head - back + N * 2) % N;
 
-        /// <summary>Положение в момент времени хоста <paramref name="rt"/>. extrapolated — снапшотов на этот момент ещё нет.</summary>
+        /// <summary>Position at host time <paramref name="rt"/>. extrapolated - there are no snapshots for this moment yet.</summary>
         public bool Sample(float rt, float maxExtrapolate, out Vector3 pos, out float rot, out bool flip, out bool extrapolated, out Vector2 velocity)
         {
             velocity = Vector2.zero;
@@ -160,7 +160,7 @@ namespace LuckyTowerCoop.Net
             int newest = m_head;
             if (rt >= m_t[newest])
             {
-                // данных на этот момент нет: немного продолжаем движение по скорости, дальше стоим
+                // no data for this moment: continue moving by velocity for a bit, then stand still
                 float dt = Mathf.Min(rt - m_t[newest], maxExtrapolate);
                 Vector2 vel = m_v[newest];
                 if (vel == Vector2.zero && m_count >= 2)
@@ -189,7 +189,7 @@ namespace LuckyTowerCoop.Net
                     float a = span > 0.0001f ? (rt - m_t[older]) / span : 1f;
                     if ((m_p[newer] - m_p[older]).sqrMagnitude > 9f)
                     {
-                        // телепорт (дверь, возрождение): не тянем через всю комнату
+                        // teleport (door, respawn): don't drag across the whole room
                         pos = m_p[older];
                         rot = m_r[older];
                         flip = m_f[older];
@@ -210,7 +210,7 @@ namespace LuckyTowerCoop.Net
         }
     }
 
-    /// <summary>Метрики качества сети у клиента (dev «net quality», стенд tools\net-quality.ps1).</summary>
+    /// <summary>Network quality metrics on the client (dev "net quality", test bench tools\net-quality.ps1).</summary>
     internal static class NetQuality
     {
         private const int LagCap = 4096;
@@ -255,7 +255,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Пришёл пакет с персонажами игроков (60 Гц): провалы в потоке.</summary>
+        /// <summary>A packet with player characters arrived (60 Hz): gaps in the stream.</summary>
         public static void OnSeatPacket()
         {
             double now = NetClock.LocalNow;
@@ -275,8 +275,8 @@ namespace LuckyTowerCoop.Net
         }
 
         /// <summary>
-        /// Кадр показа напарника: «рывок», если показанный сдвиг сильно расходится с его скоростью у хоста
-        /// (стоит, хотя идёт, — или прыгает вперёд).
+        /// Partner display frame: a "hitch" if the displayed shift differs greatly from its speed on the host
+        /// (stands still although moving - or jumps ahead).
         /// </summary>
         public static void OnPartnerFrame(Vector3 shown, Vector2 hostVel, float dt, bool extrapolated)
         {
@@ -313,7 +313,7 @@ namespace LuckyTowerCoop.Net
         private static int s_errN;
         private static float s_errMax;
 
-        /// <summary>Сверка предсказания своего персонажа с хостом (по номеру нажатия): насколько ошиблись.</summary>
+        /// <summary>Check of our own character's prediction against the host (by input number): how far off it was.</summary>
         public static void OnReconcile(float err)
         {
             err = Math.Abs(err);

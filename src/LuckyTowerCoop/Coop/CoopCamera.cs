@@ -5,16 +5,16 @@ using UnityEngine;
 namespace LuckyTowerCoop.Coop
 {
     /// <summary>
-    /// Камера на двоих (один экран): основная виртуальная камера следит за точкой между игроками
-    /// (игра везде ставит Follow = фокус P1 — подменяем, если Follow указывает на него).
-    /// Если P2 долго за кадром — телепортируем его к P1. Онлайн: камера на своём персонаже (погиб — на напарнике).
+    /// Two-player camera (one screen): the main virtual camera follows the point between the players
+    /// (the game always sets Follow = P1 focus, so we override it when Follow points at it).
+    /// If P2 stays off-screen for long, teleport them to P1. Online: the camera follows your own character (or the partner if you died).
     /// </summary>
     public class CoopCamera : MonoBehaviour
     {
         private static readonly AccessTools.FieldRef<CameraManager> s_instance =
             AccessTools.StaticFieldRefAccess<CameraManager>(AccessTools.Field(typeof(CameraManager), "m_instance"));
 
-        /// <summary>Дальше этого расстояния камера держит только P1 (игроки в разных частях уровня).</summary>
+        /// <summary>Beyond this distance the camera follows P1 only (players in different parts of the level).</summary>
         private const float MaxGroupDistance = 18f;
 
         private Transform m_target;
@@ -32,14 +32,14 @@ namespace LuckyTowerCoop.Coop
             {
                 return;
             }
-            var p1Focus = p1.Components != null ? p1.Components.CameraFocusPoint : null; // у тела фокуса может уже не быть
+            var p1Focus = p1.Components != null ? p1.Components.CameraFocusPoint : null; // the body may no longer have a focus point
             EnsureTarget();
 
             var p2 = CoopPlayers.P2;
             Vector3 desired;
             if (Net.NetSession.Role != Net.NetRole.None)
             {
-                // онлайн: у каждого свой экран — камера на своём персонаже; погиб или ждёт в двери — смотрим за напарником
+                // online: each player has their own screen - camera follows your own character; if dead or waiting at a door, watch the partner
                 var own = Net.NetSession.IsClient ? p1 : CoopPlayers.CharOfSeat(Seat.A);
                 var partner = Net.NetSession.IsClient ? p2 : CoopPlayers.CharOfSeat(Seat.B);
                 var follow = Usable(own) ? own : Usable(partner) ? partner : null;
@@ -61,7 +61,7 @@ namespace LuckyTowerCoop.Coop
                              Vector2.Distance(p1Focus.position, p2.Components.CameraFocusPoint.position) < MaxGroupDistance;
                 if (group && CoopTransitions.IsWaiting(p1))
                 {
-                    desired = p2.Components.CameraFocusPoint.position; // P1 ждёт в двери — показываем P2
+                    desired = p2.Components.CameraFocusPoint.position; // P1 waits at the door - show P2
                 }
                 else if (group)
                 {
@@ -78,7 +78,7 @@ namespace LuckyTowerCoop.Coop
             else if (Net.NetSession.Role != Net.NetRole.None && vcam.Follow != m_target
                      && (vcam.Follow == null || vcam.Follow.GetComponentInParent<LuckyTower.CharacterSystem.Player>() != null))
             {
-                vcam.Follow = m_target; // онлайн: после смерти игра могла прицепить камеру к телу — ведём свою цель
+                vcam.Follow = m_target; // online: after death the game may have attached the camera to the body - follow our own target
             }
 
             UpdateLeash(cam, p1);
@@ -86,7 +86,7 @@ namespace LuckyTowerCoop.Coop
 
         private void UpdateLeash(CameraManager cam, LuckyTower.CharacterSystem.Player p1)
         {
-            // в онлайне у каждого свой экран — подтягивать отставшего незачем
+            // online: each player has their own screen - no need to pull the straggler along
             float leash = Net.NetSession.Role != Net.NetRole.None ? 0f : CoopConfig.LeashSeconds.Value;
             var p2 = CoopPlayers.P2;
             var gm = GameManager.InstanceNoWarnings;

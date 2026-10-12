@@ -6,9 +6,9 @@ using LuckyTowerCoop.Coop;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Переход между сценами через дверь (башня ↔ деревня): игра переносит P1 через DontDestroyOnLoad,
-    /// мы так же переносим живого P2 вместе с вещами. Выход в меню/новый забег идёт через DestroyAll —
-    /// тогда P2 уничтожается вместе с P1.
+    /// Scene transition through a door (tower <-> village): the game carries P1 over via DontDestroyOnLoad,
+    /// and we likewise carry the living P2 along with their items. Exit to menu/new run goes through DestroyAll -
+    /// then P2 is destroyed together with P1.
     /// </summary>
     [HarmonyPatch]
     internal static class ScenePatches

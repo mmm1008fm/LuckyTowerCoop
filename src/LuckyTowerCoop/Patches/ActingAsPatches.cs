@@ -10,8 +10,8 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Код предметов/действий игры обращается к «текущему игроку» (Player.CurrentPlayer, GameManager.Player).
-    /// Пока действует второй игрок (его апдейт, ввод, урон, смерть, его кошель) — подставляем его.
+    /// Game code for items/actions refers to the "current player" (Player.CurrentPlayer, GameManager.Player).
+    /// While the second player is acting (their update, input, damage, death, their pouch) we substitute them.
     /// </summary>
     [HarmonyPatch]
     internal static class ActingAsPatches
@@ -25,7 +25,7 @@ namespace LuckyTowerCoop.Patches
             return p2 != null && c == p2 ? TargetSwap.SwapTo(p2) : default;
         }
 
-        // --- апдейт второго игрока (ввод, команды, подбор, броски) ---
+        // --- second player update (input, commands, pickup, throws) ---
 
         [HarmonyPatch(typeof(GamePlayer), "Update")]
         [HarmonyPrefix]
@@ -51,7 +51,7 @@ namespace LuckyTowerCoop.Patches
             return __exception;
         }
 
-        // --- урон и смерть второго игрока ---
+        // --- second player damage and death ---
 
         [HarmonyPatch(typeof(CharacterAction), nameof(CharacterAction.GetDamaged))]
         [HarmonyPrefix]
@@ -65,7 +65,7 @@ namespace LuckyTowerCoop.Patches
             return __exception;
         }
 
-        // --- превращение (зелье-монстр, джинн, прислужник): игра заменяет объект «текущего игрока» новым телом ---
+        // --- transformation (monster potion, genie, minion): the game replaces the "current player" object with a new body ---
 
         [HarmonyPatch(typeof(CharacterAction), nameof(CharacterAction.TransformAction))]
         [HarmonyPrefix]
@@ -77,7 +77,7 @@ namespace LuckyTowerCoop.Patches
         {
             if (__state.Swapped)
             {
-                // новое тело второго игрока игра записала в GameManager.Player — делаем его вторым, главного возвращаем
+                // the game stored the second player's new body in GameManager.Player - make it the second player and restore the main one
                 var gm = GameManager.InstanceNoWarnings;
                 var body = TargetSwap.CurrentOf(gm);
                 var p2 = CoopPlayers.P2;
@@ -91,7 +91,7 @@ namespace LuckyTowerCoop.Patches
             return __exception;
         }
 
-        // --- удар оружием: объекты «только для игрока» (рычаги) сверяют владельца с главным игроком ---
+        // --- weapon hit: player-only objects (levers) compare the owner with the main player ---
 
         [HarmonyPatch(typeof(Weapon), "GetPotentialHitTargets")]
         [HarmonyPrefix]
@@ -105,7 +105,7 @@ namespace LuckyTowerCoop.Patches
             return __exception;
         }
 
-        // --- применение урона оружием: рычаги и автоматы платят монетами того, кто ударил; убийство засчитывается ему ---
+        // --- weapon damage: levers and slot machines take coins from whoever hit them; the kill is credited to them ---
 
         [HarmonyPatch(typeof(Weapon), "ApplyDamage")]
         [HarmonyPrefix]
@@ -119,7 +119,7 @@ namespace LuckyTowerCoop.Patches
             return __exception;
         }
 
-        // --- кошель: подставляем его владельца ---
+        // --- pouch: substitute its owner ---
 
         private static GamePlayer OwnerOf(GoldSack sack)
         {
@@ -165,7 +165,7 @@ namespace LuckyTowerCoop.Patches
             }
         }
 
-        // --- кучка монет: экипирует тот, кто подбирает ---
+        // --- coin pile: equipped by whoever picks it up ---
 
         [HarmonyPatch]
         private static class CoinEquipPatch

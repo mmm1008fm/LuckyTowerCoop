@@ -5,8 +5,8 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Player.OnEnable занимает первый свободный слот VonWansts и всегда берёт Rewired player 0,
-    /// а при активной бутылке возрождения насильно садится в слот 0. Для P2 исправляем после оригинала.
+    /// Player.OnEnable takes the first free VonWansts slot and always uses Rewired player 0,
+    /// and with an active revival bottle it forcibly takes slot 0. For P2 we fix this after the original.
     /// </summary>
     [HarmonyPatch(typeof(GamePlayer), "OnEnable")]
     internal static class PlayerOnEnablePatch
@@ -21,7 +21,7 @@ namespace LuckyTowerCoop.Patches
         }
     }
 
-    /// <summary>Оси движения читаются у Player.CurrentPlayer — для P2 берём ввод владельца паттерна.</summary>
+    /// <summary>Movement axes are read from Player.CurrentPlayer - for P2 we take the input of the pattern's owner.</summary>
     [HarmonyPatch(typeof(CommandPattern), nameof(CommandPattern.GetHorizontalAxis))]
     internal static class HorizontalAxisPatch
     {

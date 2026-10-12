@@ -6,7 +6,7 @@ using LuckyTower.RoomGeneration;
 
 namespace LuckyTowerCoop.Patches
 {
-    /// <summary>Диагностика: кто и откуда вызывает переходы между комнатами.</summary>
+    /// <summary>Diagnostics: who calls room transitions, and from where.</summary>
     [HarmonyPatch]
     internal static class TransitionLogPatches
     {

@@ -8,9 +8,9 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Coop
 {
     /// <summary>
-    /// Смерть и воскрешение: пока жив напарник, смерть одного не заканчивает забег.
-    /// Погибший воскресает, когда живой убьёт KillsToRevive монстров (или на новом этаже, если включено).
-    /// Если погибли оба — обычный game over игры.
+    /// Death and revival: while the partner is alive, one death does not end the run.
+    /// The fallen player revives when the living one kills KillsToRevive monsters (or on a new floor, if enabled).
+    /// If both die - the game's normal game over.
     /// </summary>
     public class CoopLife : MonoBehaviour
     {
@@ -19,7 +19,7 @@ namespace LuckyTowerCoop.Coop
         private static int s_segmentAtDeath;
         private static int s_floorAtDeath;
 
-        /// <summary>Смерть игрока в кооп-контексте (напарник жив): глушим game over и очистку боя.</summary>
+        /// <summary>A player's death in a co-op context (partner alive): suppress game over and combat cleanup.</summary>
         public static Character DyingInCoop { get; private set; }
 
         public static bool SomeoneDead => s_someoneDead;
@@ -34,9 +34,9 @@ namespace LuckyTowerCoop.Coop
             SceneManager.activeSceneChanged += (_, __) => s_someoneDead = false;
         }
 
-        // ---------- вызовы из патчей ----------
+        // ---------- calls from patches ----------
 
-        /// <summary>Префикс CharacterAction.Die. true — смерть в кооп-контексте.</summary>
+        /// <summary>Prefix of CharacterAction.Die. true - death in a co-op context.</summary>
         public static bool BeginDeath(Character dying)
         {
             if (Net.NetSession.IsClient || dying == null || dying.Stats.Dead || !(dying is GamePlayer player) || !CoopPlayers.IsCoopPlayer(player))
@@ -46,14 +46,14 @@ namespace LuckyTowerCoop.Coop
             var partner = player == CoopPlayers.P1 ? (GamePlayer)CoopPlayers.P2 : CoopPlayers.P1;
             if (partner == null || partner.Stats.Dead || !partner.gameObject.activeInHierarchy)
             {
-                return false; // напарника нет — обычная смерть игры
+                return false; // no partner - a normal game death
             }
             DyingInCoop = dying;
-            Plugin.Log.LogInfo($"[Life] '{dying.name}' dies, partner '{partner.name}' is alive — run continues");
+            Plugin.Log.LogInfo($"[Life] '{dying.name}' dies, partner '{partner.name}' is alive - run continues");
             return true;
         }
 
-        /// <summary>Постфикс CharacterAction.Die (тело уже создано).</summary>
+        /// <summary>Postfix of CharacterAction.Die (the body has already been created).</summary>
         public static void EndDeath(Character dying)
         {
             if (DyingInCoop != dying)
@@ -79,7 +79,7 @@ namespace LuckyTowerCoop.Coop
             Plugin.Log.LogInfo($"[Life] waiting for revive: {CoopConfig.KillsToRevive.Value} kills" + (CoopConfig.ReviveOnNewFloor.Value ? " or a new floor" : ""));
         }
 
-        /// <summary>Постфикс AchievementManager.TrackDeath — счётчик убийств.</summary>
+        /// <summary>Postfix of AchievementManager.TrackDeath - kill counter.</summary>
         public static void OnCharacterKilled(Character victim, IDamageSource source)
         {
             if (!s_someoneDead || victim == null)
@@ -101,7 +101,7 @@ namespace LuckyTowerCoop.Coop
 
         public static void DevAddKills(int n) => s_kills += n;
 
-        /// <summary>Меню: воскресить напарника, не дожидаясь убийств (сработает в ближайшем кадре, как обычное воскрешение).</summary>
+        /// <summary>Menu: revive the partner without waiting for kills (takes effect next frame, like a normal revival).</summary>
         public static void ReviveNow()
         {
             if (s_someoneDead)
@@ -110,7 +110,7 @@ namespace LuckyTowerCoop.Coop
             }
         }
 
-        /// <summary>Сбросить ожидание воскрешения (онлайн: напарник вернулся после обрыва — появится заново).</summary>
+        /// <summary>Reset the revive wait (online: the partner came back after a drop - will spawn again).</summary>
         public static void ClearDeath()
         {
             s_someoneDead = false;
@@ -123,7 +123,7 @@ namespace LuckyTowerCoop.Coop
             s_kills = 0;
         }
 
-        // ---------- воскрешение ----------
+        // ---------- revival ----------
 
         private void Update()
         {
@@ -131,7 +131,7 @@ namespace LuckyTowerCoop.Coop
             {
                 return;
             }
-            // онлайн: отключившегося напарника не воскрешаем, пока он не вернётся
+            // online: do not revive a disconnected partner until they return
             if (Net.NetSession.IsHost && !Net.NetSession.PeerReady)
             {
                 return;
@@ -165,7 +165,7 @@ namespace LuckyTowerCoop.Coop
             {
                 return;
             }
-            // онлайн: напарник отключён — он вернётся при переподключении, счётчик не показываем
+            // online: partner is disconnected - they will return on reconnect, do not show the counter
             if (Net.NetSession.IsHost && !Net.NetSession.PeerReady)
             {
                 return;
@@ -175,7 +175,7 @@ namespace LuckyTowerCoop.Coop
                 m_styleHeight = Screen.height;
                 m_style = new GUIStyle(GUI.skin.label) { fontSize = Mathf.RoundToInt(Screen.height / 30f), fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperCenter };
             }
-            string text = $"Воскрешение напарника: {s_kills}/{CoopConfig.KillsToRevive.Value} убийств" + (CoopConfig.ReviveOnNewFloor.Value ? " или новый этаж" : "");
+            string text = $"Partner revive: {s_kills}/{CoopConfig.KillsToRevive.Value} kills" + (CoopConfig.ReviveOnNewFloor.Value ? " or new floor" : "");
             var rect = new Rect(0f, Screen.height * 0.06f, Screen.width, 60f);
             m_style.normal.textColor = Color.black;
             GUI.Label(new Rect(rect.x + 2f, rect.y + 2f, rect.width, rect.height), text, m_style);

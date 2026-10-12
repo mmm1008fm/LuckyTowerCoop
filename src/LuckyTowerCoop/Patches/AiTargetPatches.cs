@@ -11,9 +11,9 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// ИИ игры целится в «игрока» через Player.VonWansts[0] / GameManager.Player.
-    /// На время апдейта ИИ подставляем туда ближайшего живого игрока и возвращаем обратно —
-    /// одна точка вместо сотен мест в коде.
+    /// Game AI targets the "player" via Player.VonWansts[0] / GameManager.Player.
+    /// During an AI update we substitute the nearest living player there and restore it afterwards -
+    /// one point instead of hundreds of places in the code.
     /// </summary>
     internal static class TargetSwap
     {
@@ -58,7 +58,7 @@ namespace LuckyTowerCoop.Patches
             var gm = GameManager.InstanceNoWarnings;
             if (st.Generation != CoopPlayers.Generation)
             {
-                // Во время подмены кто-то умер/повысился/появился: ставим актуального главного, а не сохранённое
+                // During the swap someone died/got promoted/appeared: set the current main player, not the saved one
                 var main = CoopPlayers.P1;
                 GamePlayer.VonWansts[0] = main;
                 if (gm != null && main != null)
@@ -85,7 +85,7 @@ namespace LuckyTowerCoop.Patches
 
         public static bool Active => CoopPlayers.P2 != null && CoopPlayers.P1 != null;
 
-        /// <summary>Клиент: кого игра считает «игроком» (камера, туман, свет) — вне подмен ИИ.</summary>
+        /// <summary>Client: whom the game treats as the "player" (camera, fog, light) - outside AI swaps.</summary>
         public static void SetCurrent(GameManager gm, GamePlayer p)
         {
             if (gm == null || p == null || InSwap)
@@ -132,7 +132,7 @@ namespace LuckyTowerCoop.Patches
             return __exception;
         }
 
-        // Детектор врагов висит на каждом игроке: «игрок» для него — владелец детектора.
+        // The enemy detector hangs on every player: its "player" is the detector's owner.
         [HarmonyPatch(typeof(EnemyDetectionRange), "OnTriggerEnter2D")]
         [HarmonyPrefix]
         private static void DetectEnterPrefix(EnemyDetectionRange __instance, out TargetSwap.State __state)
@@ -176,11 +176,11 @@ namespace LuckyTowerCoop.Patches
         private static Exception DetectExitFinalizer(TargetSwap.State __state, Exception __exception)
         {
             TargetSwap.Restore(__state);
-            // у каждого игрока свой список врагов, а у CombatManager общий — RemoveFurthestEnemy иногда зовётся на пустом
+            // each player has their own enemy list, while CombatManager has a shared one - RemoveFurthestEnemy is sometimes called on an empty
             return __exception is InvalidOperationException ? null : __exception;
         }
 
-        // Летающие (летучие мыши, пчёлы): цель хранится в поле.
+        // Flyers (bats, bees): the target is stored in a field.
         private static readonly AccessTools.FieldRef<FlyingBehaviour, GamePlayer> s_flyingPlayer =
             AccessTools.FieldRefAccess<FlyingBehaviour, GamePlayer>("m_player");
 

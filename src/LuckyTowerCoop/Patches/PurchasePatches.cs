@@ -11,16 +11,16 @@ using GamePlayer = LuckyTower.CharacterSystem.Player;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// Магазины и NPC с диалогом (ломбард, парикмахер, трубочист, банкир): триггер диалога запоминает менеджер диалогов первого игрока,
-    /// поэтому второй попадал в очередь первого, а оплата шла вне подмены «текущего игрока».
-    ///  • геттер DialogueTrigger.DialogueManager отдаёт менеджер того, кто сейчас «игрок» (под подменой — менеджер второго);
-    ///  • методы-«действия» магазинов (оплата, стрижка, события аниматора) выполняются от имени того, чей менеджер ведёт этот диалог;
-    ///  • банк-копилка (DropAllCoinsDialogue) работает с тем игроком, который стоит в его зоне.
-    /// На клиенте не работает: там диалоги ведёт хост.
+    /// Shops and NPCs with dialogue (pawnshop, barber, chimney sweep, banker): a dialogue trigger remembers the first player's dialogue manager,
+    /// so the second player ended up in the first one's queue, and payment happened outside the "current player" swap.
+    ///  - the DialogueTrigger.DialogueManager getter returns the manager of whoever is the "player" now (under a swap - the second one's manager);
+    ///  - shop "action" methods (payment, haircut, animator events) run on behalf of whoever's manager drives this dialogue;
+    ///  - the piggy bank (DropAllCoinsDialogue) works with the player standing in its zone.
+    /// Does not work on the client: the host drives dialogues there.
     /// </summary>
     internal static class Buyers
     {
-        /// <summary>Второй игрок, если именно его менеджер ведёт диалог с этим триггером.</summary>
+        /// <summary>The second player, if their manager is the one driving the dialogue with this trigger.</summary>
         public static GamePlayer SecondTalkingTo(DialogueTrigger t)
         {
             var p2 = CoopPlayers.P2;
@@ -46,7 +46,7 @@ namespace LuckyTowerCoop.Patches
             return null;
         }
 
-        /// <summary>Касается ли триггер объекта хотя бы одного коллайдера игрока.</summary>
+        /// <summary>Whether the trigger touches at least one player collider.</summary>
         public static bool Touching(Component shop, GamePlayer p)
         {
             if (shop == null || p == null || !p)
@@ -73,9 +73,9 @@ namespace LuckyTowerCoop.Patches
     }
 
     /// <summary>
-    /// Все методы триггеров диалога (магазины, NPC, меню): если действует второй игрок — менеджер диалогов триггера на это время его;
-    /// «действия» магазинов (оплата, стрижка, события аниматора) идут от имени того, чей менеджер ведёт этот диалог.
-    /// Поле m_dialogueManager меняем напрямую: геттер может быть встроен JIT-ом.
+    /// All dialogue trigger methods (shops, NPCs, menus): if the second player is acting, the trigger's dialogue manager is theirs for that time;
+    /// shop "actions" (payment, haircut, animator events) run on behalf of whoever's manager drives this dialogue.
+    /// We change the m_dialogueManager field directly: the getter may be inlined by the JIT.
     /// </summary>
     [HarmonyPatch]
     internal static class DialogueTriggerContextPatches
@@ -141,7 +141,7 @@ namespace LuckyTowerCoop.Patches
                 }
                 if (who == null)
                 {
-                    // действует главный игрок: триггер снова ведёт его менеджер
+                    // the main player is acting: the trigger is driven by their manager again
                     var p1 = CoopPlayers.P1;
                     var dm1 = p1 != null && p1.Components != null ? p1.Components.DialogueManager : null;
                     if (dm1 != null && s_dm(__instance) != dm1 && (dm1.CurrentDialogueTrigger == __instance || dm1.OverlappingTriggers.Contains(__instance) || name.StartsWith("OnTrigger")))
@@ -170,7 +170,7 @@ namespace LuckyTowerCoop.Patches
         }
     }
 
-    /// <summary>Банк-копилка / банкомат: работают с тем, кто стоит в зоне (иначе всегда главный игрок).</summary>
+    /// <summary>Piggy bank / ATM: work with whoever stands in the zone (otherwise always the main player).</summary>
     [HarmonyPatch]
     internal static class BankAreaPatches
     {
@@ -208,7 +208,7 @@ namespace LuckyTowerCoop.Patches
                 }
                 return;
             }
-            // Update / OpenMenu: второй игрок, если в зоне только он
+            // Update / OpenMenu: the second player, if only they are in the zone
             if (Buyers.Touching(__instance, p2) && !Buyers.Touching(__instance, CoopPlayers.P1))
             {
                 __state = TargetSwap.SwapTo(p2);

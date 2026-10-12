@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Steam-транспорт коопа: Spacewar (AppID 480) в отдельном процессе.
-       Публикация: dotnet publish -c Release (самодостаточный exe, у друга не нужен .NET). -->
+  <!-- Co-op Steam transport: Spacewar (AppID 480) in a separate process.
+       Publish: dotnet publish -c Release (self-contained exe, no .NET needed on the friend's machine). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
@@ -26,7 +26,7 @@
     <PackageReference Include="LiteNetLib" Version="2.1.4" />
   </ItemGroup>
 
-  <!-- После публикации: exe + Valve steam_api64.dll (из папки игры, SDK 1.53a = Steamworks.NET 20.1.0) + steam_appid.txt -->
+  <!-- After publishing: exe + Valve steam_api64.dll (from the game folder, SDK 1.53a = Steamworks.NET 20.1.0) + steam_appid.txt -->
   <Target Name="DeploySidecar" AfterTargets="Publish">
     <MakeDir Directories="$(SidecarDeployDir)" />
     <Copy SourceFiles="$(PublishDir)CoopNet.exe" DestinationFolder="$(SidecarDeployDir)" />

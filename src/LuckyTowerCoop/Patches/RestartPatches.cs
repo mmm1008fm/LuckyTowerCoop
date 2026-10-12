@@ -5,8 +5,8 @@ using LuckyTowerCoop.Net;
 namespace LuckyTowerCoop.Patches
 {
     /// <summary>
-    /// «Начать заново» в меню паузы у клиента ломало сессию: локальная загрузка сцены заглушена, а остальное срабатывало.
-    /// Теперь клиент отправляет хосту просьбу, а хост решает (окно в F7); сам перезапуск клиент получит как SceneLoad.
+    /// "Start over" in the pause menu broke the client's session: local scene loading is suppressed, but everything else fired.
+    /// Now the client sends the host a request and the host decides (window in F7); the client receives the restart itself as SceneLoad.
     /// </summary>
     [HarmonyPatch(typeof(MainMenuHandler))]
     internal static class RestartPatches

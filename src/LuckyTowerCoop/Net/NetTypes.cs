@@ -17,13 +17,13 @@ namespace LuckyTowerCoop.Net
 
     public enum NetTransportKind
     {
-        /// <summary>Steam через Spacewar (AppID 480), отдельный процесс CoopNet.exe.</summary>
+        /// <summary>Steam via Spacewar (AppID 480), separate CoopNet.exe process.</summary>
         Steam,
-        /// <summary>Прямой UDP (LAN / Tailscale / две копии на одном ПК).</summary>
+        /// <summary>Direct UDP (LAN / Tailscale / two copies on one PC).</summary>
         Direct,
     }
 
-    /// <summary>Типы сообщений протокола (первый байт пакета).</summary>
+    /// <summary>Protocol message types (first byte of the packet).</summary>
     public enum Msg : byte
     {
         Hello = 1,
@@ -43,32 +43,32 @@ namespace LuckyTowerCoop.Net
         PlayerState = 18,
         UiState = 19,
         GameOver = 20,
-        /// <summary>Клиент → хост: прошу полную пересинхронизацию комнаты.</summary>
+        /// <summary>Client -> host: requests a full room resync.</summary>
         ResyncRequest = 21,
-        /// <summary>Хост → клиент: контрольная сумма комнаты (имя, число и хэш сущностей).</summary>
+        /// <summary>Host -> client: room checksum (name, entity count and hash).</summary>
         RoomCheck = 22,
-        /// <summary>Хост → клиент: персонаж начал реплику (кто, ключ текста).</summary>
+        /// <summary>Host -> client: a character started a line (who, text key).</summary>
         Talk = 23,
-        /// <summary>Хост → клиент: предмет прикреплён к персонажу (рука, спина) или откреплён.</summary>
+        /// <summary>Host -> client: an item was attached to a character (hand, back) or detached.</summary>
         Attach = 24,
-        /// <summary>Хост → клиент: какие части персонажа видны (рендеры: включён/активен объект).</summary>
+        /// <summary>Host -> client: which character parts are visible (renderers: enabled/object active).</summary>
         Look = 25,
-        /// <summary>Хост → клиент: ловушка «свет погас» включила/выключила темноту.</summary>
+        /// <summary>Host -> client: the "lights out" trap turned the darkness on/off.</summary>
         LightsOut = 26,
-        /// <summary>Хост → клиент: окно выбора (диалог, магазин, джинн) у персонажа клиента открылось/закрылось.</summary>
+        /// <summary>Host -> client: a choice window (dialog, shop, genie) opened/closed for the client's character.</summary>
         Window = 27,
-        /// <summary>Клиент → хост: просьба начать забег заново / вернуться в деревню (хост решает).</summary>
+        /// <summary>Client -> host: request to restart the run / return to the village (the host decides).</summary>
         RestartRequest = 28,
-        /// <summary>Клиент → хост: передать напарнику N монет своего персонажа (меняет только хост).</summary>
+        /// <summary>Client -> host: give the partner N coins from your character (only the host changes them).</summary>
         GiveCoins = 29,
 
-        /// <summary>Хост → клиент: взорвалась башня (бочка с порохом) — показать ролик взрыва.</summary>
+        /// <summary>Host -> client: the tower (powder keg) exploded - play the explosion cutscene.</summary>
         TowerExplosion = 31,
 
         Input = 30,
     }
 
-    /// <summary>Транспорт: одно соединение «хост ↔ клиент».</summary>
+    /// <summary>Transport: a single "host <-> client" connection.</summary>
     public interface INetTransport : IDisposable
     {
         bool IsConnected { get; }
@@ -77,13 +77,13 @@ namespace LuckyTowerCoop.Net
 
         string Status { get; }
 
-        /// <summary>Подключение к удалённой стороне установлено.</summary>
+        /// <summary>Connection to the remote side established.</summary>
         event Action Connected;
 
-        /// <summary>Соединение потеряно (причина).</summary>
+        /// <summary>Connection lost (reason).</summary>
         event Action<string> Disconnected;
 
-        /// <summary>Данные: буфер, смещение, длина.</summary>
+        /// <summary>Data: buffer, offset, length.</summary>
         event Action<byte[], int, int> Received;
 
         void Poll();
@@ -100,12 +100,12 @@ namespace LuckyTowerCoop.Net
         public const float HeartbeatInterval = 0.5f;
         public const float TimeoutSeconds = 6f;
         public const float SnapshotInterval = 0.05f;
-        /// <summary>Персонажи игроков — чаще остального мира.</summary>
+        /// <summary>Player characters - more often than the rest of the world.</summary>
         public const float SeatSnapshotInterval = 1f / 60f;
         public const float InputInterval = 1f / 60f;
-        public const int MaxPacket = 960; // LiteNetLib Unreliable: максимум 1023 байта на пакет
+        public const int MaxPacket = 960; // LiteNetLib Unreliable: max 1023 bytes per packet
 
-        /// <summary>Следующий срок периодической отправки: от прошлого срока (ровный темп), после долгой паузы — от «сейчас».</summary>
+        /// <summary>Next periodic send deadline: from the previous deadline (steady pace), after a long pause - from "now".</summary>
         public static float NextTick(float due, float now, float interval)
         {
             due += interval;

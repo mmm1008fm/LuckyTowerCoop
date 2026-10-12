@@ -11,10 +11,10 @@ using Object = UnityEngine.Object;
 namespace LuckyTowerCoop.Coop
 {
     /// <summary>
-    /// Голосование за переходы (двери, боковые проходы, люк в следующий сегмент):
-    /// первый игрок «входит» и ждёт спрятанным (над входом «1/2»), переход выполняется,
-    /// когда второй входит туда же. Переход всегда исполняет P1 (GameManager.Player) обычным кодом игры,
-    /// P2 после смены комнаты переносится к нему.
+    /// Voting on transitions (doors, side passages, hatch to the next segment):
+    /// the first player "enters" and waits hidden (with "1/2" above the entrance), the transition runs
+    /// when the second one enters the same place. The transition is always executed by P1 (GameManager.Player) using the game's normal code,
+    /// P2 is moved to them after the room change.
     /// </summary>
     public class CoopTransitions : MonoBehaviour
     {
@@ -25,7 +25,7 @@ namespace LuckyTowerCoop.Coop
             public Vector3 LabelPos;
             public bool CanCancel;
             public Vector3 CancelPush;
-            /// <summary>Как выполнить переход за P1 (P1 уже не спрятан).</summary>
+            /// <summary>How to perform the transition for P1 (P1 is no longer hidden).</summary>
             public Action CommitAsP1;
         }
 
@@ -34,7 +34,7 @@ namespace LuckyTowerCoop.Coop
         private static readonly List<Wait> s_waits = new List<Wait>();
         private static bool s_bypass;
 
-        // Отложенный перенос P2 после перехода, выполненного P1
+        // Deferred move of P2 after a transition executed by P1
         private static GamePlayer s_follower;
         private static Room s_roomAtCommit;
         private static bool s_sawInEnterDoor;
@@ -68,9 +68,9 @@ namespace LuckyTowerCoop.Coop
             SceneManager.activeSceneChanged += (_, __) => ClearAll();
         }
 
-        // ---------------- точки входа из патчей ----------------
+        // ---------------- entry points from patches ----------------
 
-        /// <summary>Игрок нажал «вверх» у двери. true — выполнить оригинальный код.</summary>
+        /// <summary>The player pressed "up" at a door. true - run the original code.</summary>
         public static bool OnDoorPressed(EnterDoorCommand cmd, GamePlayer player, Door door)
         {
             if (s_bypass || door == null || !door.enabled)
@@ -85,7 +85,7 @@ namespace LuckyTowerCoop.Coop
             return Arrive(player, door, door.DoorCenter.position + Vector3.up * 2.2f, canCancel: true, cancelPush: Vector3.zero,
                 commitAsP1: () =>
                 {
-                    // P1 стоит у двери: повторяем его действие (m_results команды ещё содержит эту дверь)
+                    // P1 is standing at the door: repeat their action (the command's m_results still contains this door)
                     var p1Cmd = FindEnterDoorCommand(CoopPlayers.P1);
                     if (p1Cmd != null)
                     {
@@ -99,7 +99,7 @@ namespace LuckyTowerCoop.Coop
                 });
         }
 
-        /// <summary>Игрок вошёл в триггер перехода (люк/боковой проход). true — выполнить оригинальный код.</summary>
+        /// <summary>The player entered a transition trigger (hatch/side passage). true - run the original code.</summary>
         public static bool OnTriggerTransition(GamePlayer player, Object key, Vector3 labelPos, bool canCancel, Vector3 cancelPush, Action commitAsP1)
         {
             if (s_bypass)
@@ -109,7 +109,7 @@ namespace LuckyTowerCoop.Coop
             return Arrive(player, key, labelPos, canCancel, cancelPush, commitAsP1);
         }
 
-        // ---------------- логика ----------------
+        // ---------------- logic ----------------
 
         private static bool CoopActive(out GamePlayer p1, out GamePlayer p2)
         {
@@ -134,19 +134,19 @@ namespace LuckyTowerCoop.Coop
             if (otherWait != null && otherWait.Key == key)
             {
                 s_waits.Remove(otherWait);
-                Plugin.Log.LogInfo($"[Transition] 2/2 at {key.name} — commit (second: P{(player == p1 ? 1 : 2)})");
+                Plugin.Log.LogInfo($"[Transition] 2/2 at {key.name} - commit (second: P{(player == p1 ? 1 : 2)})");
                 if (player == p1)
                 {
-                    // P2 уже спрятан и ждёт, P1 проходит обычным кодом
+                    // P2 is already hidden and waiting, P1 goes through with the normal code
                     BeginFollow(p2);
                     return true;
                 }
 
-                // Второй — P2: прячем его, P1 выходит из ожидания и выполняет переход
+                // The second is P2: hide them, P1 leaves the wait and performs the transition
                 Hide(p2);
                 Unhide(p1);
                 BeginFollow(p2);
-                // Мы можем быть внутри апдейта P2 (где «текущий игрок» подменён на P2) — переход должен видеть P1
+                // We may be inside P2's update (where the "current player" is swapped to P2) - the transition must see P1
                 var swap = Patches.TargetSwap.SwapTo(p1);
                 try
                 {
@@ -163,7 +163,7 @@ namespace LuckyTowerCoop.Coop
                 return false;
             }
 
-            // Первый у входа — ждём второго
+            // The first is at the entrance - wait for the second
             Hide(player);
             s_waits.Add(new Wait { Player = player, Key = key, LabelPos = labelPos, CanCancel = canCancel, CancelPush = cancelPush, CommitAsP1 = commitAsP1 });
             Plugin.Log.LogInfo($"[Transition] 1/2 P{(player == p1 ? 1 : 2)} waits at {key.name}");
@@ -183,7 +183,7 @@ namespace LuckyTowerCoop.Coop
         {
             var gm = GameManager.InstanceNoWarnings;
 
-            // Отмена ожидания / второй игрок пропал
+            // Wait cancelled / the second player is gone
             for (int i = s_waits.Count - 1; i >= 0; i--)
             {
                 var w = s_waits[i];
@@ -229,7 +229,7 @@ namespace LuckyTowerCoop.Coop
             bool roomChanged = gm.CurrentRoom != s_roomAtCommit;
             if (!s_teleported && roomChanged)
             {
-                // P1 переносится в той же итерации, что и смена комнаты — переносим P2 следом (пока спрятан)
+                // P1 is moved in the same iteration as the room change - move P2 right after (while hidden)
                 s_teleported = true;
                 TeleportBehind(s_follower, p1);
             }
@@ -278,7 +278,7 @@ namespace LuckyTowerCoop.Coop
             p.Stats.InputAllowed = true;
         }
 
-        /// <summary>Метки «1/2» над входами (для отправки клиенту).</summary>
+        /// <summary>"1/2" markers above entrances (to send to the client).</summary>
         public static void GetLabels(List<(Vector3 pos, string text)> into)
         {
             into.Clear();
@@ -288,7 +288,7 @@ namespace LuckyTowerCoop.Coop
             }
         }
 
-        /// <summary>Показать персонажа, если он остался спрятан (например, перенос между сценами во время ожидания).</summary>
+        /// <summary>Show the character if left hidden (e.g. a scene change during the wait).</summary>
         public static void ForceUnhide(GamePlayer p)
         {
             s_waits.RemoveAll(w => w.Player == p);
@@ -341,7 +341,7 @@ namespace LuckyTowerCoop.Coop
             s_follower = null;
         }
 
-        // ---------------- «1/2» над входом ----------------
+        // ---------------- "1/2" above the entrance ----------------
 
         private void OnGUI()
         {

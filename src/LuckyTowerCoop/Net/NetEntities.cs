@@ -15,10 +15,10 @@ namespace LuckyTowerCoop.Net
         Seat = 3,
     }
 
-    /// <summary>Синхронизируемый объект (общий для хоста и клиента).</summary>
+    /// <summary>A synchronized object (shared by host and client).</summary>
     internal sealed class NetEntity
     {
-        /// <summary>Описание для dev-команды ent: путь, активность по цепочке родителей.</summary>
+        /// <summary>Description for the dev command "ent": path, activity along the parent chain.</summary>
         public string Describe(Transform room)
         {
             if (!Alive)
@@ -50,10 +50,10 @@ namespace LuckyTowerCoop.Net
         public Character Character;
         public PickupItem Item;
         public bool SpawnedByNet;
-        /// <summary>Летающий враг (FlyingBehaviour — не Character, но с аниматором).</summary>
+        /// <summary>Flying enemy (FlyingBehaviour - not a Character, but has an animator).</summary>
         public bool Flying;
 
-        // прикрепление к персонажу (предмет в руке): хост — что отправили; клиент — куда прикрепить
+        // attachment to a character (item in hand): host - what was sent; client - where to attach
         public string AttachKey;
         public Vector3 AttachSentLocal;
         public bool Attached;
@@ -64,29 +64,29 @@ namespace LuckyTowerCoop.Net
         public Quaternion AttachLocalRot = Quaternion.identity;
         public Vector3 AttachLocalScale = Vector3.one;
 
-        // клиент: тело погибшего — без своей физики, повторяет хоста
+        // client: corpse - no physics of its own, mirrors the host
         public bool CorpseFrozen;
 
-        // хост: что отправляли последним
+        // host: what was sent last
         public Vector3 SentPos;
         public float SentRot;
         public float SentTime = -10f;
         public bool SentActive;
         public bool SentAudio;
 
-        // клиент: цель интерполяции
+        // client: interpolation target
         public bool HasTarget;
         public Vector3 TargetPos;
         public float TargetRot;
         public bool TargetFlip;
         public int StateMismatchFrames;
-        public byte HealthByte = 255; // здоровье 0..255 от максимума (визуал урона у клиента)
-        public AudioSource Audio;     // мир: зацикленный звук (барабанщики) — играет/нет
-        public Vector2 Vel;      // клиент: скорость из снапшота (экстраполяция)
-        public float SnapTime;   // клиент: когда пришёл снапшот
-        public InterpBuffer Interp; // клиент: снапшоты по времени хоста (буфер интерполяции)
+        public byte HealthByte = 255; // health 0..255 of max (damage visuals on the client)
+        public AudioSource Audio;     // world: looping sound (drummers) - playing or not
+        public Vector2 Vel;      // client: velocity from the snapshot (extrapolation)
+        public float SnapTime;   // client: when the snapshot arrived
+        public InterpBuffer Interp; // client: snapshots by host time (interpolation buffer)
 
-        // хост: последняя отправленная сигнатура аниматора
+        // host: last sent animator signature
         public uint AnimSig;
         public float AnimSentTime = -10f;
 
@@ -115,7 +115,7 @@ namespace LuckyTowerCoop.Net
         }
     }
 
-    /// <summary>Стабильные ID объектов комнаты: путь в иерархии от корня комнаты («имя#номер среди одноимённых»).</summary>
+    /// <summary>Stable IDs of room objects: hierarchy path from the room root ("name#index among same-named").</summary>
     internal static class NetPaths
     {
         public const int SeatA = 1;
@@ -139,7 +139,7 @@ namespace LuckyTowerCoop.Net
             return string.Join(Sep, parts);
         }
 
-        // имена объектов игры содержат «/» («Window 6/4») и «#» («Door #1») — разделители пути берём служебные
+        // game object names contain "/" ("Window 6/4") and "#" ("Door #1") - so we use special path separators
         public const string Sep = "\u001f";
         private const char SepChar = '\u001f';
         private const char DupChar = '\u001e';
@@ -166,7 +166,7 @@ namespace LuckyTowerCoop.Net
             return k == 0 ? t.name : t.name + DupChar + k;
         }
 
-        /// <summary>Путь для логов: разделители заменены на читаемые.</summary>
+        /// <summary>Path for logs: separators replaced with readable ones.</summary>
         public static string Pretty(string path) => path == null ? "" : path.Replace(SepChar, '/').Replace(DupChar, '#');
 
         public static Transform Find(Transform root, string path)
@@ -209,7 +209,7 @@ namespace LuckyTowerCoop.Net
             return cur;
         }
 
-        /// <summary>FNV-1a, со сдвигом в свою область (не пересекается с местами и рантайм-ID).</summary>
+        /// <summary>FNV-1a, shifted into its own range (does not collide with seats and runtime IDs).</summary>
         public static int IdOf(string roomName, string path)
         {
             unchecked
@@ -228,8 +228,8 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        // объекты, добавленные в комнату во время игры (копии врагов, предметы от сети): не входят в маску,
-        // иначе у хоста и клиента разъезжается порядок обхода
+        // objects added to the room during play (enemy copies, items from the network): excluded from the mask,
+        // otherwise the traversal order diverges between host and client
         private static readonly HashSet<GameObject> s_runtime = new HashSet<GameObject>();
         private static readonly List<Transform> s_walk = new List<Transform>(2048);
 
@@ -265,7 +265,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Хэши путей выключенных объектов комнаты (без рантайм-объектов): клиент выравнивает рандомные декорации по именам, а не по порядку.</summary>
+        /// <summary>Hashes of paths of the room's disabled objects (excluding runtime objects): the client aligns random decorations by name, not by order.</summary>
         public static List<int> InactiveHashes(Transform root, string roomName)
         {
             var all = Walk(root);
@@ -280,12 +280,12 @@ namespace LuckyTowerCoop.Net
             return list;
         }
 
-        /// <summary>Применить: всё, чего нет в списке выключенных, — включить; что есть — выключить. Возвращает число изменений.</summary>
+        /// <summary>Apply: enable everything not in the disabled list; disable what is in it. Returns the number of changes.</summary>
         public static int ApplyInactive(Transform root, string roomName, HashSet<int> inactive)
         {
             var all = Walk(root);
             int changed = 0;
-            // копия: SetActive меняет иерархию обхода (OnEnable может создавать объекты)
+            // copy: SetActive changes the traversal hierarchy (OnEnable may create objects)
             var snapshot = new List<Transform>(all);
             for (int i = 1; i < snapshot.Count; i++)
             {
@@ -304,7 +304,7 @@ namespace LuckyTowerCoop.Net
             return changed;
         }
 
-        /// <summary>Маска activeSelf иерархии комнаты (без рантайм-объектов) в порядке обхода (выравнивание рандомайзеров на клиенте).</summary>
+        /// <summary>activeSelf mask of the room hierarchy (excluding runtime objects) in traversal order (aligns randomizers on the client).</summary>
         public static byte[] ActiveMask(Transform root, out int count)
         {
             var all = Walk(root);
@@ -342,9 +342,9 @@ namespace LuckyTowerCoop.Net
     }
 
     /// <summary>
-    /// Видимость частей персонажа. Вид со спины у двери, кошель на поясе, дырки зубов и т. п. игра переключает кодом,
-    /// который у клиента для марионеток не выполняется, — поэтому хост шлёт для каждого рендера персонажа
-    /// (кроме предметов в руках) хэш пути от корня персонажа и два флага: «включён», «объект активен».
+    /// Visibility of character parts. Back view at the door, belt pouch, tooth gaps and the like are toggled by game code
+    /// that does not run for puppets on the client - so for every character renderer the host sends
+    /// (except held items) the hash of the path from the character root and two flags: "enabled", "object active".
     /// </summary>
     internal static class NetLook
     {
@@ -395,7 +395,7 @@ namespace LuckyTowerCoop.Net
             return k;
         }
 
-        /// <summary>Хост: записать состояние; возвращает сигнатуру (менялось ли).</summary>
+        /// <summary>Host: record the state; returns the signature (whether it changed).</summary>
         public static uint Write(LiteNetLib.Utils.NetDataWriter w, Character c)
         {
             var k = Get(c);
@@ -421,7 +421,7 @@ namespace LuckyTowerCoop.Net
             return sig;
         }
 
-        /// <summary>Клиент: применить; возвращает число изменённых частей.</summary>
+        /// <summary>Client: apply; returns the number of changed parts.</summary>
         public static int Apply(Character c, LiteNetLib.Utils.NetDataReader r)
         {
             var k = Get(c);
@@ -453,7 +453,7 @@ namespace LuckyTowerCoop.Net
             return changed;
         }
     }
-    /// <summary>Есть ли предмет в библиотеке игры (её GetItem пишет ошибку в лог на каждый промах — заклинания и снаряды туда не входят).</summary>
+    /// <summary>Whether the item exists in the game's library (its GetItem logs an error on every miss - spells and projectiles are not in it).</summary>
     internal static class ItemCatalog
     {
         private static readonly HarmonyLib.AccessTools.FieldRef<ItemLibrary, Dictionary<int, PickupItem>> s_dict =
@@ -470,10 +470,10 @@ namespace LuckyTowerCoop.Net
         }
     }
 
-    /// <summary>Снимок и применение состояния Animator: состояния слоёв, веса, параметры.</summary>
+    /// <summary>Snapshot and apply of Animator state: layer states, weights, parameters.</summary>
     internal static class NetAnim
     {
-        // a.parameters создаёт новый массив на каждый вызов — кэшируем по контроллеру
+        // a.parameters allocates a new array on every call - cache per controller
         private static readonly Dictionary<RuntimeAnimatorController, AnimatorControllerParameter[]> s_params = new Dictionary<RuntimeAnimatorController, AnimatorControllerParameter[]>();
         private static readonly int[] s_hashes = new int[8];
         private static readonly float[] s_times = new float[8];
@@ -498,7 +498,7 @@ namespace LuckyTowerCoop.Net
             }
         }
 
-        /// <summary>Пишет снимок; возвращает сигнатуру без времени анимации (менялось ли состояние).</summary>
+        /// <summary>Writes a snapshot; returns a signature excluding animation time (whether the state changed).</summary>
         public static uint Write(NetDataWriter w, Animator a)
         {
             if (a == null || !a.isActiveAndEnabled || a.runtimeAnimatorController == null)
@@ -567,7 +567,7 @@ namespace LuckyTowerCoop.Net
             return sig;
         }
 
-        /// <summary>Применить снимок (или только вычитать, если a == null).</summary>
+        /// <summary>Apply a snapshot (or just read it through if a == null).</summary>
         public static void Read(NetDataReader r, Animator a, NetEntity e)
         {
             int layers = r.GetByte();
@@ -585,12 +585,12 @@ namespace LuckyTowerCoop.Net
             ulong bools = r.GetULong();
             int floatCount = r.GetByte();
             int intCount = r.GetByte();
-            // значения float/int идут в порядке параметров контроллера
+            // float/int values go in controller parameter order
             bool ok = a != null && a.isActiveAndEnabled && a.runtimeAnimatorController != null;
             AnimatorControllerParameter[] ps = ok ? Params(a) : null;
             if (ok && ps.Length != n)
             {
-                ok = false; // разные контроллеры — только вычитываем
+                ok = false; // different controllers - read only
             }
             if (!ok)
             {
@@ -638,7 +638,7 @@ namespace LuckyTowerCoop.Net
                     mismatch = true;
                 }
             }
-            // состояние расходится два снапшота подряд — принудительно ставим как у хоста
+            // state diverges two snapshots in a row - force it to match the host
             e.StateMismatchFrames = mismatch ? e.StateMismatchFrames + 1 : 0;
             if (e.StateMismatchFrames >= 2)
             {

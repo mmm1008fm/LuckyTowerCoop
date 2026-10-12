@@ -5,7 +5,7 @@ using BepInEx.Logging;
 
 namespace LuckyTowerCoop.Dev
 {
-    /// <summary>Кольцевой буфер всех логов BepInEx (включая Unity) для отладочной команды "log".</summary>
+    /// <summary>Ring buffer of all BepInEx logs (including Unity) for the "log" debug command.</summary>
     internal sealed class LogBuffer : ILogListener
     {
         private const int Capacity = 8000;

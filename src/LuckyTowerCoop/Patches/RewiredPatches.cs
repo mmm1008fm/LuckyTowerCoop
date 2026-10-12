@@ -4,7 +4,7 @@ using Rewired;
 
 namespace LuckyTowerCoop.Patches
 {
-    /// <summary>Подмешивание скриптового/сетевого ввода к конкретному Rewired-игроку (OR с устройством).</summary>
+    /// <summary>Mixing scripted/network input into a specific Rewired player (OR with the device).</summary>
     [HarmonyPatch(typeof(Player), nameof(Player.GetButton), typeof(int))]
     internal static class RewiredGetButtonPatch
     {
