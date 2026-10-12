@@ -1,4 +1,4 @@
-# Тест онлайна на одном ПК: две копии игры, A (порт отладки 47800) — хост, B (47801) — клиент по Direct.
+﻿# Online test on one PC: two game copies, A (debug port 47800) is the host, B (47801) is the client over Direct.
 param([switch]$NoBuild)
 $t = $PSScriptRoot; $g = 'D:\game\Lucky.Tower.Ultimate.v1.1.4'
 function devA($c) { & pwsh -NoProfile -File "$t\dev.ps1" $c -Port 47800 }

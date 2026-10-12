@@ -1,5 +1,5 @@
-﻿# Автотест маршрута: хост и клиент вместе проходят N дверей (голосование у двери), после каждого перехода —
-# сверка комнат, числа объектов, ненайденных у клиента, ресинхронизаций и ошибок.
+﻿# Route autotest: host and client go through N doors together (voting at the door); after each transition -
+# check rooms, object counts, objects not found on the client, resyncs and errors.
 param([int]$Rooms = 6, [switch]$NoLaunch, [string]$Until = '', [switch]$AvoidBalcony)
 $t = $PSScriptRoot
 . "$t\devlib.ps1"
@@ -31,16 +31,16 @@ for ($n = 1; $n -le $Rooms; $n++) {
     $balcRooms = if ($AvoidBalcony) { @(((DevA rooms) -split "`n") | Where-Object { $_ -match '\[(BalconyEntrance|Balcony|BalconyExit)\]' } | ForEach-Object { ($_ -split ' \[')[0] }) } else { @() }
     $allDoors = @(Doors | Where-Object { $_.Target -ne 'None' -and $_.Target -ne $room -and -not $bad.ContainsKey("$room|$($_.Name)") -and -not ($AvoidBalcony -and $balcRooms -contains $_.Target) })
     $allExits = @(((DevA exits) -split "`n") | ForEach-Object { $m = [regex]::Match($_, '^(Side|Hatch) (.+?) center=\(([-\d.]+), ([-\d.]+)\) target=(\S+)'); if ($m.Success) { [pscustomobject]@{ Kind = $m.Groups[1].Value; Name = $m.Groups[2].Value; X = [double]$m.Groups[3].Value; Y = [double]$m.Groups[4].Value; Target = $m.Groups[5].Value } } })
-    # сначала — куда ещё не ходили; иначе назад
-    # особые комнаты («S02_F03_R01: Crusher Room») — тупики с запертым входом; идём туда только если больше некуда
-    # к цели (-Until): предпочитаем двери в комнату-вход на балкон и на сам балкон
+    # first - places not visited yet; otherwise back
+    # special rooms ('S02_F03_R01: Crusher Room') are dead ends with a locked entrance; go there only if there is nowhere else
+    # toward the goal (-Until): prefer doors into the balcony entrance room and the balcony itself
     $goal = if ($Until) { @(((DevA rooms) -split "`n") | Where-Object { $_ -match '\[BalconyEntrance\]' } | ForEach-Object { ($_ -split ' \[')[0] }) } else { @() }
     $doors = @($allDoors | Where-Object { -not $seen.ContainsKey($_.Target) } | Sort-Object { if ($Until -and ($_.Target -match $Until -or $goal -contains $_.Target)) { -1 } elseif ($_.Target -match ':$') { 1 } else { 0 } })
     $exits = @($allExits | Where-Object { -not $seen.ContainsKey($_.Target) })
-    # всё обойдено: сначала в хаб (оттуда больше путей), потом куда угодно, кроме комнаты, из которой пришли
+    # everything visited: first to the hub (more paths from there), then anywhere except the room we came from
     if ($doors.Count -eq 0 -and $exits.Count -eq 0) { $doors = @($allDoors | Sort-Object { if ($_.Target -match 'HUB') { 0 } elseif ($_.Target -ne $prev) { 1 } else { 2 } }); $exits = $allExits }
     $inv = [Globalization.CultureInfo]::InvariantCulture
-    # игрок хоста заперт (бочка с порохом / прерванная катсцена) — освобождаем, иначе ни одна дверь не сработает
+    # host player is stuck (powder keg / interrupted cutscene) - release, otherwise no door will work
     if ((DevA where) -match '^P1 .*move=False') { "     P1 locked: $((DevA free).Trim())" }
     if ($doors.Count -gt 0) {
         $d = $doors[0]
@@ -56,7 +56,7 @@ for ($n = 1; $n -le $Rooms; $n++) {
     $ok = $false
     for ($i = 0; $i -lt 20; $i++) { Start-Sleep 1; $ra = Get-Room (DevA where); if ($ra -ne $room) { $ok = $true; break } }
     if (-not $ok -and $d -and $doors.Count -gt 0) {
-        # повтор: освободить ожидающего, добить врагов (дверь могла быть заперта), снова к двери
+        # retry: release the waiting player, finish off enemies (the door may have been locked), back to the door
         DevA 'tap p2 down' | Out-Null; DevB 'tap p1 down' | Out-Null; DevA killall | Out-Null; DevA unlock | Out-Null; Start-Sleep 3
         "     retry $($d.Name): $(((DevA doors) -split "`n" | Where-Object { $_ -match "^$([regex]::Escape($d.Name)) " } | ForEach-Object { [regex]::Match($_, 'enabled=\S+ opened=\S+ lock=\S+').Value }) -join ' ')"
         DevA "tp p1 $x $y" | Out-Null; Start-Sleep -Milliseconds 600; DevA 'tap p1 up' | Out-Null; Start-Sleep 1
@@ -69,7 +69,7 @@ for ($n = 1; $n -le $Rooms; $n++) {
     "[$n] $room --$($d.Name)--> host=$ra client=$rb moved=$ok | entities host=$(Count 47800) client=$(Count 47801) | gfx A:$([regex]::Matches($wa,'gfx=\w+').Value -join ',') B:$([regex]::Matches($wb,'gfx=\w+').Value -join ',')"
     if ($unres) {
         "     unresolved: $($unres.Substring(0, [Math]::Min(220, $unres.Length)))"
-        # сверка иерархии: родитель первого ненайденного пути на обеих сторонах
+        # hierarchy check: parent of the first not-found path on both sides
         $m3 = [regex]::Match($unres, 'not found here: ([^;]+)')
         if ($m3.Success) {
             $p = $m3.Groups[1].Value.Trim(); $cut = $p.LastIndexOf('/'); $parent = if ($cut -gt 0) { $p.Substring(0, $cut) } else { '' }

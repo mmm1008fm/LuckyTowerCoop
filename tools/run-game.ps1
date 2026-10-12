@@ -1,4 +1,4 @@
-# Запуск игры для автотестов: закрывает старый процесс, стартует, ждёт главное меню.
+﻿# Launch the game for autotests: kills the old process, starts it, waits for the main menu.
 param([string]$GameDir = 'D:\game\Lucky.Tower.Ultimate.v1.1.4', [int]$TimeoutSec = 90)
 $dev = Join-Path $PSScriptRoot 'dev.ps1'
 Get-Process 'Lucky Tower Ultimate' -ErrorAction SilentlyContinue | Stop-Process -Force

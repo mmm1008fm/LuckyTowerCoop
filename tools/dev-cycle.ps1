@@ -1,4 +1,4 @@
-# Полный цикл для автотестов: сборка плагина -> запуск игры -> (опц.) загрузка башни и ожидание P2.
+﻿# Full cycle for autotests: build the plugin -> launch the game -> (optional) load the tower and wait for P2.
 param([switch]$Tower, [switch]$NoBuild)
 $t = $PSScriptRoot
 Get-Process 'Lucky Tower Ultimate' -ErrorAction SilentlyContinue | Stop-Process -Force

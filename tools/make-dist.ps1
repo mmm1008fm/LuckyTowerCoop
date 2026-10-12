@@ -1,5 +1,5 @@
-# Сборка архива для раздачи: Release-плагин + CoopNet + BepInEx + установщик.
-# Результат: dist\LuckyTowerCoop_<версия>.zip  (внутри: Установить.cmd, Удалить.cmd, installer\, payload\)
+﻿# Build the distribution archive: Release plugin + CoopNet + BepInEx + installer.
+# Result: dist\LuckyTowerCoop_<version>.zip  (contents: Install.cmd, Uninstall.cmd, README.txt, installer\, payload\)
 param([string]$GameDir = 'D:\game\Lucky.Tower.Ultimate.v1.1.4')
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -18,19 +18,20 @@ Copy-Item "$GameDir\BepInEx\core" "$pl\BepInEx\core" -Recurse
 Copy-Item "$GameDir\BepInEx\plugins\LuckyTowerCoop" "$pl\BepInEx\plugins\LuckyTowerCoop" -Recurse
 Copy-Item "$PSScriptRoot\installer\install.ps1" "$stage\installer\"
 
-$enc = [System.Text.Encoding]::GetEncoding(866)  # .cmd читается в OEM-кодировке консоли
-[IO.File]::WriteAllText("$stage\Установить.cmd", "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"%~dp0installer\install.ps1`"`r`n", $enc)
-[IO.File]::WriteAllText("$stage\Удалить.cmd", "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"%~dp0installer\install.ps1`" -Uninstall`r`n", $enc)
+# .cmd files are pure ASCII, so any encoding works
+$ascii = [System.Text.Encoding]::ASCII
+[IO.File]::WriteAllText("$stage\Install.cmd", "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"%~dp0installer\install.ps1`"`r`n", $ascii)
+[IO.File]::WriteAllText("$stage\Uninstall.cmd", "@echo off`r`npowershell -NoProfile -ExecutionPolicy Bypass -File `"%~dp0installer\install.ps1`" -Uninstall`r`n", $ascii)
 @"
-LuckyTowerCoop $version — кооп для Lucky Tower Ultimate
+LuckyTowerCoop $version - co-op mod for Lucky Tower Ultimate
 
-Установка: распакуйте архив куда угодно и запустите «Установить.cmd».
-Он сам найдёт игру (или спросит папку), поставит/обновит мод и сохранит ваши настройки.
-Удаление: «Удалить.cmd» (файлы игры не меняются).
+Install: unpack the archive anywhere and run "Install.cmd".
+It finds the game by itself (or asks for the folder), installs/updates the mod and keeps your settings.
+Uninstall: "Uninstall.cmd" (game files are not modified).
 
-В игре: F7 — онлайн-меню. Хост: «Создать игру». Друг: «Открыть список друзей (Steam)» → «Войти».
-Нужен запущенный Steam у обоих. У обоих должна стоять одна и та же версия мода.
-"@ | Set-Content "$stage\ПРОЧТИ.txt" -Encoding utf8
+In game: F7 opens the online menu. Host: "Create game". Friend: "Open friends list (Steam)" -> "Join".
+Both players need Steam running. Both must have the same mod version.
+"@ | Set-Content "$stage\README.txt" -Encoding utf8
 
 $zip = Join-Path $root "dist\LuckyTowerCoop_$version.zip"
 if (Test-Path $zip) { Rename-Item $zip "LuckyTowerCoop_${version}_old_$(Get-Date -Format HHmmss).zip" }
