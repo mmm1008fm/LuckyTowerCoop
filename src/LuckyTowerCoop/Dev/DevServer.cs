@@ -220,6 +220,43 @@ namespace LuckyTowerCoop.Dev
                     return path;
                 }
 
+                case "itemnames":
+                {
+                    // itemnames [часть имени] — имена предметов библиотеки игры
+                    var names = new System.Collections.Generic.List<string>();
+                    if (gm != null)
+                    {
+                        foreach (var it in gm.ItemLibrary.ItemList)
+                        {
+                            if (it != null && (args.Length < 2 || it.name.IndexOf(args[1], StringComparison.OrdinalIgnoreCase) >= 0))
+                            {
+                                names.Add(it.name);
+                            }
+                        }
+                    }
+                    return string.Join(", ", names);
+                }
+
+                case "kegboom":
+                {
+                    // kegboom — взорвать башню бочкой (вызов DestroyTower у бочки-ловушки или бочки-предмета этой сцены)
+                    foreach (var k in UnityEngine.Object.FindObjectsByType<LuckyTower.Traps.TrapPowderKeg>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+                    {
+                        k.DestroyTower();
+                        return $"TrapPowderKeg {k.name}.DestroyTower()";
+                    }
+                    foreach (var k in UnityEngine.Object.FindObjectsByType<LuckyTower.Items.SpecialItemPowderKeg>(FindObjectsInactive.Exclude, FindObjectsSortMode.None))
+                    {
+                        k.DestroyTower();
+                        return $"SpecialItemPowderKeg {k.name}.DestroyTower()";
+                    }
+                    // в сцене бочек нет (они в комнатах поздних сегментов) — пустышка с тем же компонентом: проверка сети, не игры
+                    var dummy = new GameObject("DevKeg");
+                    var dk = dummy.AddComponent<LuckyTower.Traps.TrapPowderKeg>();
+                    dk.DestroyTower();
+                    return "dummy TrapPowderKeg.DestroyTower()";
+                }
+
                 case "find":
                 {
                     // find <подстрока имени> — объекты сцены (включая неактивные): путь, позиция, активность (до 25)
@@ -594,7 +631,7 @@ namespace LuckyTowerCoop.Dev
                 {
                     // spawnitem <Name> [p1|p2] [dx]
                     var who = args.Length > 2 && args[2] == "p2" ? (GamePlayer)CoopPlayers.P2 : CoopPlayers.P1;
-                    var prefab = gm != null ? gm.ItemLibrary.GetItem(args[1]) : null;
+                    var prefab = gm != null ? gm.ItemLibrary.GetItem(args[1].Replace('_', ' ')) : null;
                     if (who == null || prefab == null)
                     {
                         return "no player or unknown item";

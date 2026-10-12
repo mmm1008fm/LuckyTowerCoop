@@ -41,6 +41,7 @@
     <Reference Include="UnityEngine.AudioModule" HintPath="$(ManagedDir)\UnityEngine.AudioModule.dll" Private="false" />
     <Reference Include="UnityEngine.IMGUIModule" HintPath="$(ManagedDir)\UnityEngine.IMGUIModule.dll" Private="false" />
     <Reference Include="UnityEngine.TextRenderingModule" HintPath="$(ManagedDir)\UnityEngine.TextRenderingModule.dll" Private="false" />
+    <Reference Include="UnityEngine.VideoModule" HintPath="$(ManagedDir)\UnityEngine.VideoModule.dll" Private="false" />
   </ItemGroup>
 
   <!-- После сборки кладём плагин и LiteNetLib прямо в игру -->

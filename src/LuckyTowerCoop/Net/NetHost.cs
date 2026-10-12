@@ -1167,6 +1167,18 @@ namespace LuckyTowerCoop.Net
             m_s.Send(w, Delivery.Reliable);
         }
 
+        /// <summary>Взрыв башни (бочка с порохом): клиент показывает тот же ролик, смерть придёт обычным путём.</summary>
+        internal void SendTowerExplosion()
+        {
+            if (!NetSession.PeerReady)
+            {
+                return;
+            }
+            var w = m_s.Begin(Msg.TowerExplosion);
+            m_s.Send(w, Delivery.Reliable);
+            Plugin.Log.LogInfo("[NetHost] tower explosion sent");
+        }
+
         internal void SendTalk(Character speaker, string key, bool dead, bool endless)
         {
             int id = IdOf(speaker);

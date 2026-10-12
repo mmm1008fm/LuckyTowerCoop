@@ -232,6 +232,9 @@ namespace LuckyTowerCoop.Net
                 case Msg.LightsOut:
                     OnLightsOut(r);
                     break;
+                case Msg.TowerExplosion:
+                    OnTowerExplosion();
+                    break;
                 case Msg.Window:
                     OnWindow(r);
                     break;
@@ -320,6 +323,83 @@ namespace LuckyTowerCoop.Net
         private static readonly System.Reflection.MethodInfo s_lightsOn = AccessTools.Method(typeof(LuckyTower.Traps.TrapLightsOut), "OnPlayerExits");
         private static readonly System.Reflection.MethodInfo s_lightsInitialize = AccessTools.Method(typeof(LuckyTower.Traps.TrapLightsOut), "Initialize");
         private static readonly AccessTools.FieldRef<LuckyTower.Traps.TrapLightsOut, bool> s_lightsInit = AccessTools.FieldRefAccess<LuckyTower.Traps.TrapLightsOut, bool>("m_initialized");
+
+        // ================= взрыв башни =================
+
+        /// <summary>Идёт ролик взрыва башни от хоста: локальный DestroyTower у клиента не запускается, ролик показывает сам клиент.</summary>
+        internal static bool TowerExploding { get; private set; }
+
+        private void OnTowerExplosion()
+        {
+            if (TowerExploding)
+            {
+                return;
+            }
+            Plugin.Log.LogInfo("[NetClient] tower explosion");
+            m_s.StartCoroutine(TowerExplosionRoutine());
+        }
+
+        private static IEnumerator TowerExplosionRoutine()
+        {
+            var cm = CameraManager.Instance;
+            var gm = GameManager.InstanceNoWarnings;
+            if (cm == null || gm == null || cm.PlayingVideo)
+            {
+                yield break;
+            }
+            TowerExploding = true;
+            try
+            {
+                // персонажи не двигаются, пока идёт ролик (как у хоста)
+                foreach (var p in new[] { CoopPlayers.P1, CoopPlayers.P2 })
+                {
+                    if (p != null && p.Stats != null)
+                    {
+                        p.Stats.InputAllowed = false;
+                        p.Stats.AllowMovement = false;
+                    }
+                }
+                try
+                {
+                    // звук как у хоста: музыка и звуки башни глохнут
+                    gm.MasterMixer.GetFloat("SounddesignVolume", out var vol);
+                    PlayerPrefs.SetFloat("soundDesignVolume", vol);
+                    AudioManager.Instance.StopMusic();
+                    gm.MasterMixer.SetFloat("SounddesignVolume", -80f);
+                }
+                catch (Exception e)
+                {
+                    Plugin.Log.LogWarning($"[NetClient] explosion audio: {e.Message}");
+                }
+                var vp = cm.MainVideoPlayer;
+                if (vp == null || gm.VideoLibrary == null || gm.VideoLibrary.ExplodingTower == null)
+                {
+                    yield break;
+                }
+                cm.PlayingVideo = true;
+                vp.clip = gm.VideoLibrary.ExplodingTower;
+                vp.renderMode = UnityEngine.Video.VideoRenderMode.CameraNearPlane;
+                vp.Prepare();
+                float until = Time.realtimeSinceStartup + 10f;
+                while (!vp.isPrepared && Time.realtimeSinceStartup < until)
+                {
+                    yield return null;
+                }
+                vp.Play();
+                Plugin.Log.LogInfo("[NetClient] tower explosion video playing");
+                until = Time.realtimeSinceStartup + 90f;
+                while (vp.isPlaying && Time.realtimeSinceStartup < until)
+                {
+                    yield return null;
+                }
+                Plugin.Log.LogInfo("[NetClient] tower explosion video finished");
+                cm.PlayingVideo = false;
+            }
+            finally
+            {
+                TowerExploding = false;
+            }
+        }
 
         private void OnLightsOut(NetDataReader r)
         {

@@ -62,6 +62,9 @@ namespace LuckyTowerCoop.Net
         /// <summary>Клиент → хост: передать напарнику N монет своего персонажа (меняет только хост).</summary>
         GiveCoins = 29,
 
+        /// <summary>Хост → клиент: взорвалась башня (бочка с порохом) — показать ролик взрыва.</summary>
+        TowerExplosion = 31,
+
         Input = 30,
     }
 
