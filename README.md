@@ -3,7 +3,7 @@
 Two-player co-op mod for **Lucky Tower Ultimate**: a second Vanst on the same PC or online, over Steam or by direct IP.
 It is a BepInEx mod. It does not modify game files and uninstalls with one click.
 
-Current version: **0.3.7**. Both players must run the same version.
+Current version: **0.3.8**. Both players must run the same version.
 
 [Russian version](README.ru.md)
 
